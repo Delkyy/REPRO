@@ -303,6 +303,32 @@ document.addEventListener('drop', async e => {
 });
 setInterval(() => { const c = $('#clock'); if (c) c.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }, 1000);
 
+// ---------- gamepad: standard mapping (https://w3c.github.io/gamepad/#remapping). A=0 B=1 X=2 Y=3, dpad 12-15, left stick axes 0/1
+let padPrev = {}, padHeld = 0;
+function pollPad() {
+  const gp = navigator.getGamepads?.()[0];
+  if (gp && app.classList.contains('couch') && !$('#modal').classList.contains('open')) {
+    const b = i => gp.buttons[i]?.pressed, ax = gp.axes;
+    const now = { up: b(12) || ax[1] < -.5, down: b(13) || ax[1] > .5, left: b(14) || ax[0] < -.5, right: b(15) || ax[0] > .5, a: b(0), bb: b(1), x: b(2), y: b(3), sel: b(8) };
+    const edge = k => now[k] && !padPrev[k];
+    const ovOpen = $('#cov').classList.contains('open');
+    if (ovOpen) { if (edge('a')) launch(cList[cFocus]); if (edge('bb')) $('#cov').classList.remove('open'); }
+    else {
+      const rep = (k, key) => { if (now[k] && (edge(k) || (padHeld > 18 && padHeld % 5 == 0))) cKey(key); };
+      rep('up', 'ArrowUp'); rep('down', 'ArrowDown'); rep('left', 'ArrowLeft'); rep('right', 'ArrowRight');
+      if (edge('a')) cOpen(); if (edge('x')) cKey('x'); if (edge('y')) cKey('y'); if (edge('sel')) setMode('desktop');
+    }
+    padHeld = (now.up || now.down || now.left || now.right) ? padHeld + 1 : 0;
+    padPrev = now;
+  } else if (gp && padAnyEdge(gp) && !app.classList.contains('couch') && !$('#modal').classList.contains('open')) {
+    setMode('couch');
+  }
+  requestAnimationFrame(pollPad);
+}
+function padAnyEdge(gp) { const any = gp.buttons.some(b => b.pressed); const r = any && !padPrev.any; padPrev.any = any; return r; }
+window.addEventListener('gamepadconnected', e => toast(`controller connected: <b>${esc(e.gamepad.id)}</b>`));
+pollPad();
+
 function renderAll() { renderSide(); renderMain(); renderDetail(); if (app.classList.contains('couch')) renderCouch(); }
 async function refresh(showToast) { S = await repro.scan(); if (showToast) toast(`rescanned: ${S.games.length} games`); renderAll(); }
 (async () => {
