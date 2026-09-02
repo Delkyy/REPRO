@@ -23,7 +23,7 @@ const SYSTEMS = Object.fromEntries(Object.entries(SYSDB).map(([k, v]) => [k, v.n
 const readJson = (p, fallback) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return fallback; } };
 const writeJson = (p, v) => fs.writeFileSync(p, JSON.stringify(v, null, 2));
 
-let config = readJson(P.config, { emulators: {}, romDirs: [], mode: 'desktop', ui: 'desk', theme: 'billet' });
+let config = readJson(P.config, { emulators: {}, romDirs: [], mode: 'desktop', ui: 'desk', theme: 'billet', views: [], panels: { side: true, detail: true }, cardSize: 150 });
 let library = readJson(P.library, { games: {} }); // keyed by rom path
 const saveConfig = () => writeJson(P.config, config);
 const saveLibrary = () => writeJson(P.library, library);
@@ -173,7 +173,13 @@ function emuFolders(id, e) {
 function snapshot() {
   const emus = {};
   for (const [id, e] of Object.entries(config.emulators)) emus[id] = { ...e, name: recipes[id]?.name || id, systems: recipes[id]?.systems || [], exeDir: e.exe ? path.dirname(e.exe) : null, folders: emuFolders(id, e) };
-  return { games: Object.values(library.games), unsorted: library.unsorted || [], emulators: emus, systems: SYSTEMS, sysdb: SYSDB, root: ROOT, recipeArgs: Object.fromEntries(Object.entries(recipes).map(([k, r]) => [k, r.args])), config: { mode: config.mode, ui: config.ui, theme: config.theme, romDirs: config.romDirs } };
+  return { games: Object.values(library.games), unsorted: library.unsorted || [], emulators: emus, systems: SYSTEMS, sysdb: SYSDB, root: ROOT, recipeArgs: Object.fromEntries(Object.entries(recipes).map(([k, r]) => [k, r.args])), config: { mode: config.mode, ui: config.ui, theme: config.theme, romDirs: config.romDirs, views: config.views || [], panels: config.panels || { side: true, detail: true }, cardSize: config.cardSize || 150 } };
+}
+// duplicates: same title across different systems isn't a dupe, but same title+sys with a different path is
+function findDuplicates() {
+  const groups = {};
+  for (const g of Object.values(library.games)) { const k = g.sys + '::' + g.title.toLowerCase(); (groups[k] ??= []).push(g); }
+  return Object.values(groups).filter(l => l.length > 1);
 }
 
 // ---------- launch
@@ -214,6 +220,7 @@ function buildMenu() {
       { label: 'Add rom folder…', accelerator: 'CmdOrCtrl+O', click: () => send('menu', 'addRomDir') },
       { label: 'Add emulator…', click: () => send('menu', 'addExe') },
       { label: 'Rescan library', accelerator: 'F5', click: () => send('menu', 'rescan') },
+      { label: 'Find duplicates…', click: () => send('menu', 'duplicates') },
       { type: 'separator' },
       { label: 'Open REPRO folder', click: () => shell.openPath(ROOT) },
       { label: 'Open config.json', click: () => shell.openPath(P.config) },
@@ -277,3 +284,7 @@ ipcMain.handle('fullscreen', (_, on) => win.setFullScreen(on));
 ipcMain.handle('root', () => ROOT);
 ipcMain.handle('themes', () => fs.readdirSync(P.themes).filter(d => fs.existsSync(path.join(P.themes, d, 'theme.json'))).map(d => ({ id: d, ...readJson(path.join(P.themes, d, 'theme.json'), {}) })));
 ipcMain.handle('detectOne', (_, exe) => { const r = recipeForExe(exe); return r ? { recipe: r.id, name: r.name, exe } : null; });
+ipcMain.handle('duplicates', () => findDuplicates());
+ipcMain.handle('saveView', (_, view) => { config.views = config.views || []; const i = config.views.findIndex(v => v.id === view.id); if (i >= 0) config.views[i] = view; else config.views.push(view); saveConfig(); return snapshot(); });
+ipcMain.handle('removeView', (_, id) => { config.views = (config.views || []).filter(v => v.id !== id); saveConfig(); return snapshot(); });
+ipcMain.handle('createSystemFolder', (_, sys) => { const p = path.join(ROOT, 'roms', sys); fs.mkdirSync(p, { recursive: true }); if (!config.romDirs.some(r => r.path === p)) { config.romDirs.push({ path: p, system: sys }); saveConfig(); } shell.openPath(p); return snapshot(); });
