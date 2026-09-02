@@ -282,6 +282,59 @@ function prepareSave(g) {
   return { saveDir: dir, activePath: act };
 }
 
+
+// ---- configure emulator memcard dirs to point at REPRO saves folder ----
+// Called once when an emulator is added/configured, and on first launch.
+// Sources:
+//   DuckStation ini keys: github.com/stenzek/duckstation/blob/master/src/core/settings.cpp
+//   PCSX2 ini keys: Documents/PCSX2/inis/PCSX2.ini [Folders] MemoryCards, [EmuCore] McdFolderAutoManage
+function patchEmulatorMemcardDir(id, e) {
+  const r = recipes[id]; if (!r || !e?.dataDir) return;
+  if (id === 'duckstation') {
+    const ini = path.join(e.dataDir, 'settings.ini');
+    if (!fs.existsSync(ini)) return;
+    let s = fs.readFileSync(ini, 'utf8');
+    const saveDir = path.join(SAVE_DIR, 'ps1');
+    fs.mkdirSync(saveDir, { recursive: true });
+    // Set Card1Type to PerGameTitle so each game gets its own card named <Title>_1.mcd
+    s = s.replace(/^Card1Type\s*=.*/m, 'Card1Type = PerGameTitle');
+    // Set the directory to our saves/ps1 folder — use absolute path (safest)
+    const absDir = saveDir.split(path.sep).join('\\');
+    // Directory key is in [MemoryCards] section; replace it or add it
+    if (s.includes('[MemoryCards]')) {
+      s = s.replace(/^(Directory\s*=.*)$/m, `Directory = ${absDir}`);
+      if (!s.match(/^Directory\s*=/m)) {
+        s = s.replace('[MemoryCards]', `[MemoryCards]\nDirectory = ${absDir}`);
+      }
+    }
+    // Remove hardcoded Card1Path
+    s = s.replace(/^Card1Path\s*=.*/m, '');
+    // Remove any hardcoded Card1Path so the auto-named file is used
+    s = s.replace(/^Card1Path\s*=.*/m, '');
+    fs.writeFileSync(ini, s);
+    console.log('[saves] DuckStation memcard dir →', saveDir);
+  }
+  if (id === 'pcsx2') {
+    const ini = path.join(e.dataDir, 'inis', 'PCSX2.ini');
+    if (!fs.existsSync(ini)) return;
+    let s = fs.readFileSync(ini, 'utf8');
+    const saveDir = path.join(SAVE_DIR, 'ps2');
+    fs.mkdirSync(saveDir, { recursive: true });
+    // PCSX2 uses an absolute or relative path; absolute is safest here
+    s = s.replace(/^MemoryCards\s*=.*/m, `MemoryCards = ${saveDir.split(path.sep).join('\\')}`);
+    // McdFolderAutoManage already true from user's ini — ensure it stays
+    if (!/McdFolderAutoManage/.test(s)) {
+      s = s.replace(/(\[EmuCore\])/, '$1\nMcdFolderAutoManage = true');
+    }
+    fs.writeFileSync(ini, s);
+    console.log('[saves] PCSX2 memcard dir →', saveDir);
+  }
+}
+function patchAllEmulatorMemcardDirs() {
+  for (const [id, e] of Object.entries(config.emulators)) {
+    try { patchEmulatorMemcardDir(id, e); } catch(err) { console.warn('[saves] memcard patch failed for', id, err.message); }
+  }
+}
 // ---------- launch
 let running = null;
 function emulatorFor(sys) {
@@ -423,7 +476,7 @@ function registerHubKey() {
   buildMenu();
   return hubKeyOk;
 }
-app.whenReady().then(() => { if (!process.argv.includes('--smoke')) createWindow(); startGuideHook(); });
+app.whenReady().then(() => { if (!process.argv.includes('--smoke')) { createWindow(); startGuideHook(); patchAllEmulatorMemcardDirs(); } });
 app.on('window-all-closed', () => app.quit());
 app.on('will-quit', () => { globalShortcut.unregisterAll(); stopGuideHook(); });
 module.exports = { detectEmulators, scanLibrary, snapshot, config, saveConfig, recipes, resolveDataDir, ROOT };
@@ -433,7 +486,7 @@ ipcMain.handle('snapshot', () => snapshot());
 ipcMain.handle('detect', async () => detectEmulators());
 ipcMain.handle('scan', async () => scanLibrary());
 ipcMain.handle('launch', (_, id) => launch(id));
-ipcMain.handle('setEmulator', (_, { id, exe }) => { config.emulators[id] = { exe, dataDir: resolveDataDir(recipes[id], exe) }; saveConfig(); buildMenu(); return snapshot(); });
+ipcMain.handle('setEmulator', (_, { id, exe }) => { config.emulators[id] = { exe, dataDir: resolveDataDir(recipes[id], exe) }; saveConfig(); buildMenu(); try { patchEmulatorMemcardDir(id, config.emulators[id]); } catch {} return snapshot(); });
 ipcMain.handle('openPath', (_, p) => shell.openPath(p));
 ipcMain.handle('launchEmu', (_, id) => { const e = config.emulators[id]; if (!e?.exe) return; spawn(e.exe, [], { cwd: path.dirname(e.exe), detached: true, stdio: 'ignore' }).unref(); });
 ipcMain.handle('addRomDir', async (_, { dir, system }) => { config.romDirs.push({ path: dir, system: system || null }); saveConfig(); return scanLibrary(); });
