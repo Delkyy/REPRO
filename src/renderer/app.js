@@ -3,7 +3,8 @@ const $ = s => document.querySelector(s), body = document.body;
 let S = { games: [], unsorted: [], emulators: {}, systems: {}, config: {} };
 let filter = 'all', sel = null, focus = 0, couchList = [], rowsMeta = [], ROOT = '';
 let THEMES = [];
-const sysc = k => `style="--sysc:var(--sys-${k})"`;
+const sysc = k => `style="--sysc:${S.sysdb?.[k]?.color || 'var(--accent)'}"`;
+const logo = k => `<i class="logo" style="--m:url('${fileUrl(ROOT + '/assets/systems/' + k + '.svg')}')"></i>`;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fileUrl = p => 'file:///' + p.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/');
 const fmtPt = s => !s ? '—' : s < 3600 ? `${Math.round(s / 60)}m` : `${Math.floor(s / 3600)}h ${Math.round((s % 3600) / 60)}m`;
@@ -21,10 +22,13 @@ function renderSide() {
   const counts = {}; S.games.forEach(g => counts[g.sys] = (counts[g.sys] || 0) + 1);
   const B = (f, ico, txt, n, dot) => `<button data-f="${f}" class="${filter == f ? 'on' : ''}"><span class="ico">${ico}</span>${dot ? `<span class="dot ${dot}"></span>` : ''}<span class="txt">${txt}</span><span class="n">${n}</span></button>`;
   let h = `<h4>Library</h4>${B('all', '▦', 'All games', S.games.length)}${B('recent', '▶', 'Continue', Math.min(6, played().length))}${B('fav', '★', 'Favorites', S.games.filter(g => g.fav).length)}<h4>Systems</h4>`;
-  for (const k of Object.keys(S.systems)) if (counts[k]) h += B(k, k.toUpperCase().slice(0, 3), sysName(k), counts[k], hasEmu(k) ? 'ok' : 'warn').replace('<button', `<button ${sysc(k)}`);
+  for (const k of Object.keys(S.systems)) if (counts[k]) h += `<button data-f="${k}" class="${filter == k ? 'on' : ''}" ${sysc(k)}><span class="ico sys">${logo(k)}</span><span class="txt">${esc(sysName(k))}${hasEmu(k) ? '' : ' <small style="color:var(--accent2)">no emu</small>'}</span><span class="n">${counts[k]}</span></button>`;
+  h += `<h4>Emulators</h4>`;
+  for (const [id, e] of Object.entries(S.emulators)) h += `<button data-f="emu:${id}" class="${filter == 'emu:' + id ? 'on' : ''}" ${sysc(e.systems[0])}><span class="ico sys">${logo(id)}</span><span class="txt">${esc(e.name)}</span><span class="n">${e.systems.map(x => x.toUpperCase()).join(' ')}</span></button>`;
+  h += `<button data-f="__addemu"><span class="ico">+</span><span class="txt" style="color:var(--accent)">add emulator…</span></button>`;
   h += `<h4>Needs you</h4>${B('unsorted', '?', 'Unsorted', S.unsorted.length, S.unsorted.length ? 'warn' : 'ok')}`;
   $('#side').innerHTML = h;
-  $('#side').querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filter = b.dataset.f; renderSide(); renderGrid(); });
+  $('#side').querySelectorAll('[data-f]').forEach(b => b.onclick = () => { if (b.dataset.f == '__addemu') return addExe(); filter = b.dataset.f; renderSide(); renderGrid(); });
 }
 const hasEmu = sys => Object.values(S.emulators).some(e => e.systems?.includes(sys) && e.exe);
 function list() {
@@ -45,6 +49,7 @@ function renderGrid() {
     $('#grid').querySelectorAll('[data-open]').forEach(b => b.onclick = () => repro.showInFolder(b.dataset.open));
     return;
   }
+  if (filter.startsWith('emu:')) return renderEmu(filter.slice(4));
   const l = list();
   $('#grid').style.display = 'grid';
   $('#sub').textContent = `${l.length} games${S.systems[filter] ? ' · ' + emuName(filter) : ''}`;
@@ -52,16 +57,34 @@ function renderGrid() {
   else $('#grid').innerHTML = l.map(g => `<div class="card ${sel == g.id ? 'sel' : ''}" data-id="${esc(g.id)}" ${sysc(g.sys)}>${artEl(g)}<span class="tag">${esc(g.sys.toUpperCase())}</span>${g.fav ? '<span class="fav">★</span>' : ''}${g.playtime ? `<span class="pt">${fmtPt(g.playtime)}</span>` : ''}</div>`).join('');
   $('#grid').querySelectorAll('.card').forEach(c => { c.onclick = () => { sel = c.dataset.id; renderGrid(); renderDetail(); $('#detail').classList.add('open'); }; c.ondblclick = () => launch(c.dataset.id); });
 }
+function renderEmu(id) {
+  const e = S.emulators[id]; if (!e) { filter = 'all'; return renderGrid(); }
+  $('#title').innerHTML = `${logo(id)} ${esc(e.name)}`;
+  $('#sub').textContent = `${e.systems.map(sysName).join(', ')} · ${S.games.filter(g => e.systems.includes(g.sys)).length} games`;
+  $('#grid').style.display = 'block';
+  $('#grid').innerHTML = `
+    <div class="row" style="margin:0 0 18px"><button class="btn primary" style="width:auto" id="eLaunch">▶ Open ${esc(e.name)}</button><button class="btn" id="eChange">change exe…</button></div>
+    <div class="sect"><h5>Files</h5>
+    ${e.folders.map(f => `<div class="slot"><div class="sh" style="background:var(--bg)"></div><div class="t"><b>${esc(f.label)}</b><small>${esc(f.path)}</small></div><div class="act" style="opacity:1"><button data-open="${esc(f.path)}">open folder</button></div></div>`).join('')}
+    <div class="slot"><div class="sh" style="background:var(--bg)"></div><div class="t"><b>exe</b><small>${esc(e.exe)}</small></div><div class="act" style="opacity:1"><button data-show="${esc(e.exe)}">show in folder</button></div></div>
+    </div>
+    <div class="sect"><h5>Launch args (from recipes/${id}.json)</h5><div class="kv">${e.systems.map(k => `<span>${esc(sysName(k))}</span><code>${esc((S.recipeArgs?.[id]?.[k] || ['{rom}']).join(' '))}</code>`).join('')}</div></div>`;
+  $('#eLaunch').onclick = () => repro.launchEmu(id);
+  $('#eChange').onclick = async () => { const p = await repro.pickExe(); if (p) { S = await repro.setEmulator({ id, exe: p }); renderAll(); } };
+  $('#grid').querySelectorAll('[data-open]').forEach(b => b.onclick = () => repro.openPath(b.dataset.open));
+  $('#grid').querySelectorAll('[data-show]').forEach(b => b.onclick = () => repro.showInFolder(b.dataset.show));
+}
+async function addExe() { const p = await repro.pickExe(); if (!p) return; const r = await repro.detectOne(p); if (!r) return toast(`no recipe matches <b>${esc(p.split(/[\\/]/).pop())}</b>. custom emulators come in M4.`); S = await repro.setEmulator({ id: r.recipe, exe: p }); toast(`added <b>${esc(r.name)}</b>`); renderAll(); }
 function renderDetail() {
   const g = byId(sel); if (!g) { $('#detail').innerHTML = '<div class="empty">pick a game</div>'; return; }
   const emu = emuName(g.sys), ok = hasEmu(g.sys);
-  $('#detail').style.cssText = `--sysc:var(--sys-${g.sys})`;
+  $('#detail').style.cssText = `--sysc:${S.sysdb?.[g.sys]?.color || 'var(--accent)'}`;
   $('#detail').innerHTML = `
   <button class="icon close" id="dClose">✕</button>
-  <div class="hero">${g.art ? `<img src="${fileUrl(g.art)}">` : ''}<div class="cover">${artEl(g)}</div></div>
+  <div class="hero">${g.art ? `<div class="bd"><img src="${fileUrl(g.art)}"></div>` : ''}<div class="cover">${artEl(g)}</div></div>
   <div class="body">
     <h3>${esc(g.title)}</h3>
-    <div class="badges"><span class="badge sys">${esc(sysName(g.sys))}</span><span class="badge">${fmtPt(g.playtime)} played</span><span class="badge">last ${fmtLast(g.lastPlayed)}</span>${g.fav ? '<span class="badge">★ fav</span>' : ''}</div>
+    <div class="badges"><span class="badge sys">${logo(g.sys)} ${esc(sysName(g.sys))}</span><span class="badge">${fmtPt(g.playtime)} played</span><span class="badge">last ${fmtLast(g.lastPlayed)}</span>${g.fav ? '<span class="badge">★ fav</span>' : ''}</div>
     <button class="btn primary" id="dPlay" ${ok ? '' : 'disabled style="opacity:.5"'}>▶ Play${ok ? '' : ' (no emulator set)'}</button>
     <div class="row"><button class="btn" id="dFav">★ ${g.fav ? 'Unfavorite' : 'Favorite'}</button><button class="btn" id="dFolder">▣ Folder</button></div>
     <div class="sect"><h5>Saves</h5><div class="hint-empty">save manager is milestone 2.</div></div>
@@ -85,7 +108,7 @@ function renderCouch() {
   for (const k of Object.keys(S.systems)) { const it = S.games.filter(g => g.sys == k).sort((a, b) => a.title.localeCompare(b.title)); if (it.length) rows.push({ k, n: sysName(k), items: it }); }
   couchList = []; rowsMeta = [];
   if (!rows.length) { $('#inner').innerHTML = `<div class="hint-empty" style="padding:20px 48px">no games yet. press ⚙ to set up.</div>`; $('#hero').innerHTML = ''; return; }
-  $('#inner').innerHTML = rows.map((r, ri) => `<div class="crow" data-ri="${ri}" ${r.k == 'continue' ? '' : sysc(r.k)}><h3><b>${esc(r.n)}</b> ${r.items.length}</h3><div class="strip">${r.items.map(g => { couchList.push(g.id); rowsMeta.push(ri); return `<div class="tile" data-id="${esc(g.id)}" ${sysc(g.sys)}>${artEl(g)}</div>`; }).join('')}</div></div>`).join('');
+  $('#inner').innerHTML = rows.map((r, ri) => `<div class="crow" data-ri="${ri}" ${r.k == 'continue' ? '' : sysc(r.k)}><h3>${r.k == 'continue' ? '' : logo(r.k)}<b>${esc(r.n)}</b> ${r.items.length}</h3><div class="strip">${r.items.map(g => { couchList.push(g.id); rowsMeta.push(ri); return `<div class="tile" data-id="${esc(g.id)}" ${sysc(g.sys)}>${artEl(g)}</div>`; }).join('')}</div></div>`).join('');
   $('#rows').querySelectorAll('.tile[data-id]').forEach((t, i) => { t.onmouseenter = () => setFocus(i); t.onclick = () => { if (focus == i) openOv(); else setFocus(i); }; });
   setFocus(Math.min(focus, couchList.length - 1));
 }
@@ -102,17 +125,17 @@ function setFocus(i) {
   const maxX = Math.max(0, strip.scrollWidth - $('#rows').clientWidth);
   strip.style.transform = `translateX(-${Math.min(maxX, Math.max(0, t.offsetLeft - pad - t.offsetWidth * 0.07))}px)`;
   const g = byId(couchList[focus]);
-  const h = $('#hero'); h.style.cssText = `--sysc:var(--sys-${g.sys})`; h.classList.remove('swap'); void h.offsetWidth; h.classList.add('swap');
-  h.innerHTML = `<div class="sys">${esc(sysName(g.sys))} · ${esc(emuName(g.sys))}</div><h1>${esc(g.title)}</h1><div class="meta"><span>${fmtPt(g.playtime)} played</span><span>last: ${fmtLast(g.lastPlayed)}</span>${g.fav ? '<span>★</span>' : ''}</div><div class="hint"><span class="p">▶ Play</span><span>★</span></div>`;
+  const h = $('#hero'); h.style.cssText = `--sysc:${S.sysdb?.[g.sys]?.color || 'var(--accent)'}`; h.classList.remove('swap'); void h.offsetWidth; h.classList.add('swap');
+  h.innerHTML = `<div class="sys">${logo(g.sys)} ${esc(sysName(g.sys))} · ${esc(emuName(g.sys))}</div><h1>${esc(g.title)}</h1><div class="meta"><span>${fmtPt(g.playtime)} played</span><span>last: ${fmtLast(g.lastPlayed)}</span>${g.fav ? '<span>★</span>' : ''}</div><div class="hint"><span class="p">▶ Play</span><span>★</span></div>`;
   const a = $('#bgA'), b = $('#bgB'), nxt = bgFlip ? a : b, cur = bgFlip ? b : a; bgFlip = !bgFlip;
   nxt.style.backgroundImage = g.art ? `url("${fileUrl(g.art)}")` : 'none';
   nxt.classList.add('on'); cur.classList.remove('on');
 }
 function openOv() {
   const g = byId(couchList[focus]); if (!g) return;
-  $('#ov').style.cssText = `--sysc:var(--sys-${g.sys})`;
+  $('#ov').style.cssText = `--sysc:${S.sysdb?.[g.sys]?.color || 'var(--accent)'}`;
   $('#ov').innerHTML = `<div class="box">${g.art ? `<img class="big" src="${fileUrl(g.art)}">` : `<div class="noart">no art yet</div>`}
-   <div class="body"><h2>${esc(g.title)}</h2><div class="badges"><span class="badge sys">${esc(sysName(g.sys))}</span><span class="badge">${fmtPt(g.playtime)} played</span><span class="badge">${esc(emuName(g.sys))}</span></div>
+   <div class="body"><h2>${esc(g.title)}</h2><div class="badges"><span class="badge sys">${logo(g.sys)} ${esc(sysName(g.sys))}</span><span class="badge">${fmtPt(g.playtime)} played</span><span class="badge">${esc(emuName(g.sys))}</span></div>
    <div class="big-btns"><button class="btn primary f" style="width:auto" id="ovPlay">▶ Play</button><button class="btn" id="ovFav">★</button></div>
    <div class="desc">${esc(g.file)}</div></div></div>`;
   $('#ovPlay').onclick = () => launch(g.id); $('#ovFav').onclick = () => toggleFav(g.id);
@@ -161,6 +184,10 @@ $('#modeSeg').querySelectorAll('button').forEach(b => b.onclick = () => setMode(
 $('#uiSeg').querySelectorAll('button').forEach(b => b.onclick = () => setUI(b.dataset.u));
 $('#q').oninput = () => renderGrid();
 $('#btnSetup').onclick = () => openSetup(false);
+repro.onMenu((cmd, arg) => {
+  ({ addRomDir: () => $('#btnAdd').click(), addExe, rescan: () => $('#btnRescan').click(), setup: () => openSetup(false), search: () => { setMode('desktop'); $('#q').focus(); },
+     mode: () => setMode(arg), theme: () => setTheme(arg), ui: () => setUI(arg) })[cmd]?.();
+});
 $('#btnAdd').onclick = async () => { const d = await repro.pickFolder(); if (d) { S = await repro.addRomDir({ dir: d }); toast(`added <b>${esc(d)}</b>`); renderAll(); } };
 $('#btnRescan').onclick = async () => { S = await repro.scan(); toast(`rescanned: ${S.games.length} games`); renderAll(); };
 let tt; function toast(h) { const t = $('#toast'); t.innerHTML = h; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 3000); }

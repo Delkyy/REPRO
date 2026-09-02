@@ -1,5 +1,4 @@
-/* per-system colors. sources: docs/research-identities.md (console branding/hardware, lifted for dark bg) */
-:root{--sys-gc:#8F82D6;--sys-wii:#2BB7E8;--sys-ps1:#5B93E6;--sys-ps2:#3D8BF2;--sys-xbox:#3FB43F;--sys-x360:#92C83E;--sys-n64:#F5B201;--sys-snes:#9A8CE8;--sys-dc:#FF9900;--sys-pc:#9A9DA3}
+/* per-system colors come from systems.json (sources: docs/research-identities.md) */
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
 body{background:var(--bg);color:var(--fg);font-family:var(--font);-webkit-font-smoothing:antialiased;overflow:hidden;transition:background .3s,color .3s;--u:1}
@@ -32,7 +31,7 @@ kbd{font-family:var(--mono);font-size:10px;background:var(--panel);border:1px so
 body[data-mode="desktop"] .desk{display:grid;grid-template-columns:220px minmax(0,1fr) 340px}
 .side{border-right:1px solid var(--line);padding:16px 10px;background:var(--bg2);overflow:auto}
 .side h4{font-size:10px;letter-spacing:.14em;color:var(--muted);padding:12px 10px 6px;text-transform:uppercase}
-.side button{display:flex;width:100%;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;font-size:13px;color:var(--muted);white-space:nowrap}
+.side button{display:flex;width:100%;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;font-size:13px;color:var(--muted);white-space:nowrap}
 .side button .n{margin-left:auto;font-family:var(--mono);font-size:11px;opacity:.7}
 .side button .ico{display:none;font-family:var(--mono);font-size:10px;font-weight:600;width:28px;height:28px;border-radius:7px;place-items:center;border:1px solid var(--line)}
 .side button:hover{background:var(--panel);color:var(--fg)}
@@ -53,11 +52,12 @@ body[data-mode="desktop"] .desk{display:grid;grid-template-columns:220px minmax(
 .card .pt{position:absolute;bottom:0;left:0;right:0;padding:6px 8px;font-size:10px;font-family:var(--mono);background:linear-gradient(transparent,rgba(0,0,0,.85));color:#ddd}
 .detail{border-left:1px solid var(--line);background:var(--bg2);overflow:auto;padding:0;position:relative}
 .detail .close{display:none;position:absolute;top:10px;right:10px;z-index:3}
-.detail .hero{aspect-ratio:3/2;background:var(--panel);overflow:hidden;position:relative}
-.detail .hero img{width:100%;height:100%;object-fit:cover;filter:blur(18px) brightness(.5);transform:scale(1.2)}
+.detail .hero{aspect-ratio:3/2;background:var(--panel);position:relative;margin-bottom:40px}
+.detail .hero .bd{position:absolute;inset:0;overflow:hidden}
+.detail .hero .bd img{width:100%;height:100%;object-fit:cover;filter:blur(18px) brightness(.5);transform:scale(1.2)}
 .detail .hero .cover{position:absolute;left:18px;bottom:-40px;width:110px;border-radius:6px;box-shadow:0 10px 30px rgba(0,0,0,.6);overflow:hidden;background:var(--panel)}
 .detail .hero .cover img{filter:none;transform:none;aspect-ratio:3/4.2;object-fit:cover}
-.detail .body{padding:52px 18px 18px}
+.detail .body{padding:12px 18px 18px}
 .detail h3{font-family:var(--display);font-size:17px;font-weight:700;line-height:1.15}
 .meta{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:var(--muted);margin:8px 0 14px;font-family:var(--mono)}
 .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:8px;font-weight:700;font-size:13px;border:1px solid var(--line)}
@@ -193,3 +193,14 @@ body.dragging .drop{display:grid}
 .badge.sys{background:var(--sysc,var(--accent));color:#000;border-color:transparent}
 .ov .badge{font-size:calc(12px*var(--u))}
 .detail .hero .cover img{filter:none;transform:none}
+
+/* system logos: assets/systems/*.svg used as a css mask so they take any color */
+.logo{display:inline-block;height:14px;width:40px;vertical-align:-2px;background:currentColor;-webkit-mask:var(--m) center/contain no-repeat;mask:var(--m) center/contain no-repeat}
+.side .ico.sys{display:grid;place-items:center;width:40px;height:24px;border:0;color:var(--sysc,var(--muted))}
+.side button .ico.sys{display:grid}
+.side .ico.sys .logo{width:38px;height:20px}
+.badge.sys .logo{height:12px;width:30px;color:#000}
+.crow h3 .logo{height:16px;width:44px;margin-right:6px;vertical-align:-3px;color:var(--sysc,var(--fg))}
+.chero .sys .logo{height:calc(14px*var(--u));width:calc(44px*var(--u));vertical-align:-3px;margin-right:6px}
+.chero .sys{color:var(--sysc)}
+.main h2 .logo{height:22px;width:60px;vertical-align:-3px;margin-right:8px;color:var(--fg)}

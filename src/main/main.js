@@ -1,5 +1,5 @@
 // REPRO main process: config, recipes, detect, scan, launch. plain node, no framework.
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
 const fs = require('fs');
 const fsp = require('fs/promises');
 const path = require('path');
@@ -17,10 +17,8 @@ const P = {
 };
 for (const d of [P.art, P.themes]) fs.mkdirSync(d, { recursive: true });
 
-const SYSTEMS = {
-  gc: 'GameCube', wii: 'Wii', ps1: 'PlayStation', ps2: 'PlayStation 2',
-  xbox: 'Xbox', x360: 'Xbox 360', pc: 'PC',
-};
+const SYSDB = JSON.parse(fs.readFileSync(path.join(ROOT, 'systems.json'), 'utf8'));
+const SYSTEMS = Object.fromEntries(Object.entries(SYSDB).map(([k, v]) => [k, v.name]));
 
 const readJson = (p, fallback) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return fallback; } };
 const writeJson = (p, v) => fs.writeFileSync(p, JSON.stringify(v, null, 2));
@@ -91,8 +89,10 @@ async function detectEmulators(extraDirs = []) {
 // ---------- scan roms
 const ALL_EXT = {}; // ext -> [system]
 // these are launchable but a scan should never pick them up (every emulator ships .exe/.bin/.elf files)
-const NOSCAN = new Set(['.exe', '.bin', '.elf', '.gz']);
+const NOSCAN = new Set(['.exe', '.lnk', '.bin', '.elf', '.gz']); // pc games get added on purpose (M4), not by scan
 for (const r of Object.values(recipes)) for (const [sys, exts] of Object.entries(r.extensions)) for (const e of exts) if (!NOSCAN.has(e)) (ALL_EXT[e] ??= new Set()).add(sys);
+// systems.json covers systems no recipe knows yet, so their roms land in the library (unlaunchable until an emulator is added)
+for (const [sys, v] of Object.entries(SYSDB)) for (const e of v.ext) if (!NOSCAN.has(e) && !/\.(zip|iso|chd|cue|bin)$/.test(e)) (ALL_EXT[e] ??= new Set()).add(sys);
 
 function titleFromFile(name) {
   // drop region/language tags like (USA) (En,Ja) [!] but keep edition tags like (Hall of Fame Edition) (Disc 1)
@@ -159,10 +159,21 @@ function findLocalArt(g) {
   }
   return null;
 }
+// where an emulator keeps things, for the 'files' panel
+function emuFolders(id, e) {
+  const r = recipes[id]; if (!r || !e.exe) return [];
+  const out = [{ label: 'program', path: path.dirname(e.exe) }];
+  if (e.dataDir) out.push({ label: 'config / data', path: e.dataDir });
+  const fill = s => s.replace('{data}', e.dataDir || '').replace('{exe}', path.dirname(e.exe));
+  for (const [sys, sv] of Object.entries(r.saves || {})) if (sv !== 'hdd-image') { const p = fill(sv); if (fs.existsSync(p)) out.push({ label: `saves (${SYSTEMS[sys] || sys})`, path: p }); }
+  for (const [sys, st] of Object.entries(r.states || {})) { const p = fill(st); if (fs.existsSync(p)) out.push({ label: `save states (${SYSTEMS[sys] || sys})`, path: p }); }
+  for (const b of r.bios || []) { const p = fill(b); if (fs.existsSync(p)) out.push({ label: 'bios', path: p }); }
+  return out;
+}
 function snapshot() {
   const emus = {};
-  for (const [id, e] of Object.entries(config.emulators)) emus[id] = { ...e, name: recipes[id]?.name || id, systems: recipes[id]?.systems || [] };
-  return { games: Object.values(library.games), unsorted: library.unsorted || [], emulators: emus, systems: SYSTEMS, config: { mode: config.mode, ui: config.ui, theme: config.theme, romDirs: config.romDirs } };
+  for (const [id, e] of Object.entries(config.emulators)) emus[id] = { ...e, name: recipes[id]?.name || id, systems: recipes[id]?.systems || [], exeDir: e.exe ? path.dirname(e.exe) : null, folders: emuFolders(id, e) };
+  return { games: Object.values(library.games), unsorted: library.unsorted || [], emulators: emus, systems: SYSTEMS, sysdb: SYSDB, root: ROOT, recipeArgs: Object.fromEntries(Object.entries(recipes).map(([k, r]) => [k, r.args])), config: { mode: config.mode, ui: config.ui, theme: config.theme, romDirs: config.romDirs } };
 }
 
 // ---------- launch
@@ -195,13 +206,53 @@ function launch(gameId) {
 
 // ---------- window
 let win;
+const send = (ch, ...a) => win?.webContents.send(ch, ...a);
+function buildMenu() {
+  const themes = fs.readdirSync(P.themes).filter(d => fs.existsSync(path.join(P.themes, d, 'theme.json')));
+  const tpl = [
+    { label: 'File', submenu: [
+      { label: 'Add rom folder…', accelerator: 'CmdOrCtrl+O', click: () => send('menu', 'addRomDir') },
+      { label: 'Add emulator…', click: () => send('menu', 'addExe') },
+      { label: 'Rescan library', accelerator: 'F5', click: () => send('menu', 'rescan') },
+      { type: 'separator' },
+      { label: 'Open REPRO folder', click: () => shell.openPath(ROOT) },
+      { label: 'Open config.json', click: () => shell.openPath(P.config) },
+      { type: 'separator' },
+      { label: 'Settings…', accelerator: 'CmdOrCtrl+,', click: () => send('menu', 'setup') },
+      { type: 'separator' }, { role: 'quit' } ] },
+    { label: 'Edit', submenu: [ { role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }, { type: 'separator' },
+      { label: 'Find game', accelerator: 'CmdOrCtrl+F', click: () => send('menu', 'search') } ] },
+    { label: 'View', submenu: [
+      { label: 'Desktop mode', accelerator: 'CmdOrCtrl+1', click: () => send('menu', 'mode', 'desktop') },
+      { label: 'Couch mode', accelerator: 'CmdOrCtrl+2', click: () => send('menu', 'mode', 'couch') },
+      { type: 'separator' },
+      { label: 'Theme', submenu: themes.map(t => ({ label: readJson(path.join(P.themes, t, 'theme.json'), {}).name || t, click: () => send('menu', 'theme', t) })) },
+      { label: 'Scale', submenu: [ { label: 'Desk', click: () => send('menu', 'ui', 'desk') }, { label: 'TV', click: () => send('menu', 'ui', 'tv') } ] },
+      { type: 'separator' }, { role: 'togglefullscreen' }, { role: 'reload' }, { role: 'toggleDevTools' } ] },
+    { label: 'Emulators', submenu: Object.keys(config.emulators).length ? Object.entries(config.emulators).map(([id, e]) => ({ label: recipes[id]?.name || id, submenu: [
+        { label: 'Launch (no game)', click: () => spawn(e.exe, [], { cwd: path.dirname(e.exe), detached: true, stdio: 'ignore' }).unref() },
+        { type: 'separator' },
+        ...emuFolders(id, e).map(f => ({ label: 'Open ' + f.label, click: () => shell.openPath(f.path) })),
+      ] })) : [{ label: 'none set up yet', enabled: false }] },
+    { label: 'Help', submenu: [
+      { label: 'Roadmap', click: () => shell.openPath(path.join(ROOT, 'ROADMAP.md')) },
+      { label: 'Recipes folder', click: () => shell.openPath(P.recipes) },
+      { label: 'Themes folder', click: () => shell.openPath(P.themes) },
+      { label: 'Art folder', click: () => shell.openPath(P.art) },
+      { type: 'separator' },
+      { label: 'GitHub', click: () => shell.openExternal('https://github.com/Delkyy/repro') },
+      { label: 'About REPRO', click: () => dialog.showMessageBox(win, { title: 'REPRO', message: 'REPRO ' + app.getVersion(), detail: 'open-source emulator hub. one folder, every emulator, every game, every save.\n\nroot: ' + ROOT }) } ] },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(tpl));
+}
 function createWindow() {
   win = new BrowserWindow({
     width: 1400, height: 860, minWidth: 700, minHeight: 500,
-    backgroundColor: '#0e1014', autoHideMenuBar: true, title: 'REPRO',
+    backgroundColor: '#0C0C0D', title: 'REPRO',
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true },
   });
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  buildMenu();
 }
 app.whenReady().then(() => { if (!process.argv.includes('--smoke')) createWindow(); });
 app.on('window-all-closed', () => app.quit());
@@ -212,7 +263,9 @@ ipcMain.handle('snapshot', () => snapshot());
 ipcMain.handle('detect', async () => detectEmulators());
 ipcMain.handle('scan', async () => scanLibrary());
 ipcMain.handle('launch', (_, id) => launch(id));
-ipcMain.handle('setEmulator', (_, { id, exe }) => { config.emulators[id] = { exe, dataDir: resolveDataDir(recipes[id], exe) }; saveConfig(); return snapshot(); });
+ipcMain.handle('setEmulator', (_, { id, exe }) => { config.emulators[id] = { exe, dataDir: resolveDataDir(recipes[id], exe) }; saveConfig(); buildMenu(); return snapshot(); });
+ipcMain.handle('openPath', (_, p) => shell.openPath(p));
+ipcMain.handle('launchEmu', (_, id) => { const e = config.emulators[id]; if (!e?.exe) return; spawn(e.exe, [], { cwd: path.dirname(e.exe), detached: true, stdio: 'ignore' }).unref(); });
 ipcMain.handle('addRomDir', async (_, { dir, system }) => { config.romDirs.push({ path: dir, system: system || null }); saveConfig(); return scanLibrary(); });
 ipcMain.handle('removeRomDir', async (_, dir) => { config.romDirs = config.romDirs.filter(r => r.path !== dir); saveConfig(); return scanLibrary(); });
 ipcMain.handle('setPref', (_, kv) => { Object.assign(config, kv); saveConfig(); });

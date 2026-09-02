@@ -46,5 +46,8 @@
     "url": "https://github.com/dolphin-emu/dolphin/blob/master/Readme.md",
     "checked": "2026-09-01",
     "note": "-b/--batch runs without ui, requires --exec=<file>"
-  }
+  },
+  "bios": [
+    "{data}/Sys"
+  ]
 }

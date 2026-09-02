@@ -41,5 +41,8 @@
     "url": "https://github.com/PCSX2/pcsx2/blob/master/pcsx2-qt/QtHost.cpp",
     "checked": "2026-09-01",
     "note": "-batch exits after shutdown, -fullscreen, -nogui, -fastboot, -bigpicture"
-  }
+  },
+  "bios": [
+    "{data}/bios"
+  ]
 }

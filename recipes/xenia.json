@@ -32,5 +32,6 @@
     "url": "https://github.com/xenia-project/xenia/blob/master/src/xenia/app/emulator_window.cc",
     "checked": "2026-09-01",
     "note": "DEFINE_bool(fullscreen) in emulator_window.cc; positional 'target' in xenia_main.cc"
-  }
+  },
+  "bios": []
 }

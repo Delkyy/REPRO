@@ -42,5 +42,8 @@
     "url": "https://github.com/stenzek/duckstation/blob/master/src/duckstation-qt/qthost.cpp",
     "checked": "2026-09-01",
     "note": "-batch exits after power off, -fullscreen, -nogui, -fastboot, -bigpicture"
-  }
+  },
+  "bios": [
+    "{data}/bios"
+  ]
 }
