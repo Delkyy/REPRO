@@ -186,7 +186,7 @@ function renderCouch() {
   for (const k of Object.keys(S.systems)) { const it = S.games.filter(g => g.sys == k).sort((a, b) => a.title.localeCompare(b.title)); if (it.length) rows.push({ k, n: sysName(k), items: it }); }
   cList = []; cRows = [];
   if (!rows.length) { $('#cinner').innerHTML = `<div class="hint" style="padding:20px 48px">no games yet. switch to desktop and hit +.</div>`; $('#chero').innerHTML = ''; return; }
-  $('#cinner').innerHTML = rows.map((r, ri) => `<div class="crow" data-ri="${ri}" ${r.k == 'continue' ? '' : sysc(r.k)}><h3>${r.k == 'continue' ? '' : logo(r.k)}<b>${esc(r.n)}</b> ${r.items.length}</h3><div class="strip">${r.items.map(g => { cList.push(g.id); cRows.push(ri); return `<div class="ctile" data-id="${esc(g.id)}">${artEl(g)}</div>`; }).join('')}</div></div>`).join('');
+  $('#cinner').innerHTML = rows.map((r, ri) => `<div class="crow" data-ri="${ri}" ${r.k == 'continue' ? '' : sysc(r.k)} data-skin="${S.sysdb?.[r.k]?.skin || ''}"><h3>${r.k == 'continue' ? '' : logo(r.k)}<b>${esc(r.n)}</b> ${r.items.length}</h3><div class="strip">${r.items.map(g => { cList.push(g.id); cRows.push(ri); return `<div class="ctile" data-id="${esc(g.id)}">${artEl(g)}</div>`; }).join('')}</div></div>`).join('');
   $('#crows').querySelectorAll('.ctile[data-id]').forEach((t, i) => { t.onmouseenter = () => cSetFocus(i); t.onclick = () => { if (cFocus == i) cOpen(); else cSetFocus(i); }; });
   cSetFocus(Math.min(cFocus, cList.length - 1));
 }
@@ -208,6 +208,9 @@ function cSetFocus(i) {
   const a = $('#bgA'), b = $('#bgB'), nxt = bgFlip ? a : b, cur = bgFlip ? b : a; bgFlip = !bgFlip;
   nxt.style.backgroundImage = g.art ? `url("${fileUrl(g.art)}")` : 'none';
   nxt.classList.add('on'); cur.classList.remove('on');
+  const skin = S.sysdb?.[g.sys]?.skin;
+  const ck = $('#cskin'); if (skin) { ck.dataset.skin = skin; ck.classList.add('on'); } else { ck.classList.remove('on'); }
+  $('#couchwrap').classList.toggle('hasskin', !!skin);
 }
 function cOpen() {
   const g = byId(cList[cFocus]); if (!g) return;

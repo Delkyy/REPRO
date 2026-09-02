@@ -157,6 +157,7 @@ input[type=range]{accent-color:var(--accent)}
 .app.couch .couchwrap{display:block}
 .app.couch .menubar,.app.couch .top,.app.couch .rail,.app.couch .side,.app.couch .main,.app.couch .detail{display:none}
 .bgart{position:absolute;inset:-60px;background-size:cover;background-position:center 30%;filter:blur(38px) brightness(.32) saturate(1.3);transform:scale(1.08);opacity:0;transition:opacity .6s}
+.couchwrap.hasskin .bgart{filter:blur(44px) brightness(.16) saturate(.4)}
 .bgart.on{opacity:1}
 .cfade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.55) 0%,rgba(0,0,0,0) 55%),linear-gradient(0deg,var(--bg) 0%,rgba(0,0,0,0) 50%);pointer-events:none}
 .chero{position:absolute;left:calc(48px*var(--u,1));top:clamp(70px,14vh,calc(120px*var(--u,1)));width:min(58%,calc(760px*var(--u,1)));z-index:2;pointer-events:none}
@@ -197,3 +198,75 @@ input[type=range]{accent-color:var(--accent)}
 .cov .big-btns{display:flex;flex-wrap:wrap;gap:10px;margin:calc(18px*var(--u,1)) 0}
 .cov .big-btns .btn{padding:calc(14px*var(--u,1)) calc(22px*var(--u,1));font-size:calc(15px*var(--u,1));border-radius:12px;border:1px solid var(--line);font-weight:700}
 .cov .big-btns .btn.p{background:var(--accent);color:#fff;border-color:transparent}
+
+/* ---- console personality skins (couch mode) ---- */
+/* sourced treatments: docs/research-console-personality.md. built with gradients/patterns/motion only, no logos/UI clones.
+   #cskin sits behind .bgart (the real blurred cover art) so the pattern shows through the art's gaps/edges and
+   blends underneath rather than replacing it; it fades in/out per system like .bgart does. */
+#cskin{position:absolute;inset:-60px;opacity:0;transition:opacity .6s;background-size:cover;mix-blend-mode:screen}
+#cskin.on{opacity:.85}
+#cskin[data-skin="gc"]{background-image:
+  repeating-linear-gradient(45deg, rgba(255,255,255,.09) 0 2px, transparent 2px 34px),
+  repeating-linear-gradient(-45deg, rgba(255,255,255,.09) 0 2px, transparent 2px 34px),
+  radial-gradient(ellipse at 30% 40%, rgba(143,130,214,1), transparent 65%), linear-gradient(#120f22,#120f22);
+  animation: gcGlow 7s ease-in-out infinite;
+}
+@keyframes gcGlow{0%,100%{filter:brightness(1)}50%{filter:brightness(1.18)}}
+/* PS1: low-fi dither/block grid */
+#cskin[data-skin="ps1"]{background-image:
+  repeating-linear-gradient(0deg, rgba(120,150,200,.16) 0 3px, transparent 3px 6px),
+  repeating-linear-gradient(90deg, rgba(120,150,200,.12) 0 3px, transparent 3px 6px),
+  linear-gradient(160deg, #2c3440, #0d0f13);
+}
+/* PS2: glossy Y2K chrome sweep */
+#cskin[data-skin="ps2"]{background-image:
+  linear-gradient(100deg, transparent 30%, rgba(160,200,255,.35) 45%, transparent 60%),
+  linear-gradient(180deg, #142c55, #050a14);
+  background-size:250% 100%, cover;
+  animation: ps2Sweep 9s linear infinite;
+}
+@keyframes ps2Sweep{0%{background-position:120% 0,0 0}100%{background-position:-40% 0,0 0}}
+/* Xbox OG: flat green glow + faint scanlines */
+#cskin[data-skin="xbox"]{background-image:
+  repeating-linear-gradient(0deg, rgba(0,0,0,.35) 0 2px, transparent 2px 4px),
+  radial-gradient(circle at 18% 55%, rgba(63,200,63,1), transparent 58%), linear-gradient(#041505,#041505);
+}
+/* Xbox 360: diagonal color blade slabs */
+#cskin[data-skin="x360"]{background-image:
+  repeating-linear-gradient(115deg, rgba(146,200,62,.3) 0 60px, rgba(20,26,16,.05) 60px 140px),
+  linear-gradient(160deg, #182610, #05070a);
+  animation: x360Slide 14s linear infinite;
+}
+@keyframes x360Slide{0%{background-position:0 0,0 0}100%{background-position:-400px 0,0 0}}
+/* N64: primary-color box-art riot, trapezoid tile accent */
+#cskin[data-skin="n64"]{background-image:
+  radial-gradient(circle at 15% 20%, rgba(245,178,1,.7), transparent 42%),
+  radial-gradient(circle at 85% 30%, rgba(220,50,50,.55), transparent 42%),
+  radial-gradient(circle at 50% 85%, rgba(50,110,220,.55), transparent 48%), linear-gradient(#0c0a08,#0c0a08);
+}
+.crow[data-skin="n64"] .ctile{clip-path:polygon(6% 0,100% 0,94% 100%,0 100%)}
+/* SNES: two-tone lavender/grey hard split */
+#cskin[data-skin="snes"]{background-image:
+  linear-gradient(100deg, rgba(154,140,214,.6) 0%, rgba(154,140,214,.6) 48%, rgba(185,176,200,.32) 48%, rgba(185,176,200,.32) 100%),
+  linear-gradient(180deg, #16141c, #0a090d);
+}
+/* Dreamcast: orange/blue conic swirl */
+#cskin[data-skin="dc"]{background-image:
+  conic-gradient(from 0deg at 50% 45%, rgba(255,153,0,.6), rgba(60,140,255,.45), rgba(255,153,0,.6)),
+  radial-gradient(circle at 50% 45%, transparent 0 18%, #05070a 70%);
+  animation: dcSwirl 24s linear infinite;
+}
+@keyframes dcSwirl{to{transform:rotate(360deg)}}
+/* Switch: deliberately flat/minimal, dual joycon accent slivers on the row label */
+.crow[data-skin="switch"] h3{border-left-width:0;padding-left:0;position:relative}
+.crow[data-skin="switch"] h3::before{content:'';display:inline-block;width:4px;height:1em;background:#E60012;margin-right:3px;border-radius:2px}
+.crow[data-skin="switch"] h3::after{content:'';display:inline-block;width:4px;height:1em;background:#00A2E1;margin-left:3px;border-radius:2px;order:2}
+#cskin[data-skin="switch"]{background-image:linear-gradient(180deg, #1a1a1c, #0c0c0d)}
+/* Wii: pastel channel-grid + glossy sheen, bouncy tile focus */
+#cskin[data-skin="wii"]{background-image:
+  repeating-linear-gradient(0deg, rgba(255,255,255,.12) 0 42px, transparent 42px 84px),
+  repeating-linear-gradient(90deg, rgba(255,255,255,.12) 0 42px, transparent 42px 84px),
+  linear-gradient(160deg, #164560, #050a10);
+}
+.crow[data-skin="wii"] .ctile.focus{animation: wiiBounce .35s ease-out}
+@keyframes wiiBounce{0%{transform:scale(1)}45%{transform:scale(1.2)}100%{transform:scale(1.12)}}
