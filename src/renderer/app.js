@@ -236,8 +236,14 @@ function setUI(u) { document.documentElement.style.setProperty('--u', u == 'tv' 
 function setPanel(which, on) { app.classList.toggle(which == 'side' ? 'noside' : 'nodetail', !on); const p = { ...(S.config.panels || {}) }; p[which] = on; repro.setPref({ panels: p }); }
 
 /* ---------- modals: settings / duplicates ---------- */
+let modalGen = 0;
 async function openSettings() {
+  const gen = ++modalGen;
+  $('#modal').innerHTML = `<div class="box"><div class="mh"><h3>Settings</h3><button class="icon" id="mClose">✕</button></div><div class="mb"><div class="hint">scanning for emulators…</div></div></div>`;
+  $('#mClose').onclick = () => $('#modal').classList.remove('open');
+  $('#modal').classList.add('open');
   const found = await repro.detect();
+  if (gen !== modalGen || !$('#modal').classList.contains('open')) return; // dialog moved on or closed while we were scanning
   const emus = { ...S.emulators };
   for (const f of found) if (!emus[f.recipe]?.exe) emus[f.recipe] = { exe: f.exe, name: f.name, detected: true };
   const emuRows = Object.entries(emus).map(([id, e]) => `<div class="slot"><div class="sh" style="background:${e.exe ? '#3ddc84' : 'var(--accent2)'}"></div><div class="t"><b>${esc(e.name || id)}</b>${e.detected && !S.emulators[id]?.exe ? ' <small style="color:var(--accent2)">found, not added</small>' : ''}<small>${esc(e.exe || 'not set')}</small></div><div class="act" style="opacity:1"><button data-exe="${id}" data-found="${esc(e.exe || '')}">${e.detected && !S.emulators[id]?.exe ? 'add' : 'change…'}</button></div></div>`).join('');
@@ -254,16 +260,19 @@ async function openSettings() {
   const mhk = $('#mHubKey'); if (mhk) mhk.onclick = () => changeHubKey(openSettings);
   $('#mAddDir').onclick = async () => { const d = await repro.pickFolder(); if (d) { S = await repro.addRomDir({ dir: d }); openSettings(); renderAll(); } };
   $('#modal').querySelectorAll('[data-rm]').forEach(b => b.onclick = async () => { S = await repro.removeRomDir(b.dataset.rm); openSettings(); renderAll(); });
-  $('#modal').classList.add('open');
 }
 async function openDuplicates() {
+  const gen = ++modalGen;
+  $('#modal').innerHTML = `<div class="box"><div class="mh"><h3>Duplicates</h3><button class="icon" id="mClose">✕</button></div><div class="mb"><div class="hint">scanning…</div></div></div>`;
+  $('#mClose').onclick = () => $('#modal').classList.remove('open');
+  $('#modal').classList.add('open');
   const dupes = await repro.duplicates();
+  if (gen !== modalGen || !$('#modal').classList.contains('open')) return;
   $('#modal').innerHTML = `<div class="box"><div class="mh"><h3>Duplicates</h3><button class="icon" id="mClose">✕</button></div><div class="mb">
     ${dupes.length ? dupes.map(group => `<div class="slot" style="flex-direction:column;align-items:stretch"><b style="margin-bottom:6px">${esc(group[0].title)} (${esc(sysName(group[0].sys))})</b>${group.map(g => `<div class="slot"><div class="sh" style="background:var(--bg)"></div><div class="t"><small>${esc(g.path)}</small></div><div class="act" style="opacity:1"><button data-open="${esc(g.path)}">show</button></div></div>`).join('')}</div>`).join('') : '<div class="hint">no duplicates found. good scan.</div>'}
     </div></div>`;
   $('#mClose').onclick = () => $('#modal').classList.remove('open');
   $('#modal').querySelectorAll('[data-open]').forEach(b => b.onclick = () => repro.showInFolder(b.dataset.open));
-  $('#modal').classList.add('open');
 }
 
 /* ---------- glue ---------- */
@@ -277,13 +286,14 @@ $('#q').oninput = () => renderMain();
 $('#viewSeg').querySelectorAll('button').forEach(b => b.onclick = () => { view = b.dataset.v; $('#viewSeg').querySelectorAll('button').forEach(x => x.classList.toggle('on', x == b)); renderMain(); });
 document.querySelectorAll('.rail [data-f]').forEach(b => b.onclick = () => { filter = b.dataset.f; document.querySelectorAll('.rail [data-f]').forEach(x => x.classList.toggle('on', x == b)); renderSide(); renderMain(); });
 $('#cov').onclick = e => { if (e.target.id == 'cov') $('#cov').classList.remove('open'); };
-$('#modal').onclick = e => { if (e.target.id == 'modal') $('#modal').classList.remove('open'); };
+$('#modal').onclick = e => { if (e.target.id == 'modal') { modalGen++; $('#modal').classList.remove('open'); } };
 repro.onMenu((cmd, arg) => {
   ({ addRomDir: () => $('#railAdd').click(), addExe, rescan: () => refresh(true), setup: openSettings, duplicates: openDuplicates,
      search: () => { $('#q').focus(); }, mode: () => setMode(arg), theme: () => setTheme(arg), ui: () => setUI(arg),
      toast: () => toast(arg), hubkey: changeHubKey })[cmd]?.();
 });
 async function changeHubKey(onClose) {
+  const gen = ++modalGen;
   const cur = S.config.hubKey || 'Ctrl+Alt+H';
   $('#modal').innerHTML = `<div class="box"><div class="mh"><h3>Hub key</h3><button class="icon" id="mClose">✕</button></div><div class="mb">
     <div class="hint">key combo to close the running game and jump back to REPRO, from anywhere — even while the emulator has focus. examples: Ctrl+Alt+H, Ctrl+Shift+Q, F13.</div>
@@ -291,18 +301,19 @@ async function changeHubKey(onClose) {
     <div class="hint" id="hkMsg" style="margin-top:8px"></div>
     <div class="btnrow" style="margin-top:12px"><button id="hkSave" style="background:var(--accent);color:#fff;border-color:transparent">save</button></div>
     </div></div>`;
-  const close = () => { $('#modal').classList.remove('open'); onClose?.(); };
+  const close = () => { if (gen !== modalGen) return; if (onClose) onClose(); else $('#modal').classList.remove('open'); };
   $('#mClose').onclick = close;
   $('#hkSave').onclick = async () => {
     const key = $('#hkInput').value.trim(); if (!key) return;
     const r = await repro.setHubKey(key);
+    if (gen !== modalGen) return; // user navigated away while this was in flight
     if (r.ok) { S.config.hubKey = r.key; S.config.hubKeyOk = true; toast(`hub key set to <b>${esc(r.key)}</b>. map your controller's Guide/Home button to this in Windows or Steam Input to trigger it from the pad.`); close(); }
     else { $('#hkMsg').innerHTML = `<b style="color:var(--accent2)">"${esc(key)}" is already claimed by another app (Steam, Nvidia overlay, Windows, etc). kept <b>${esc(S.config.hubKey)}</b>. try a different combo.</b>`; }
   };
   $('#modal').classList.add('open');
 }
 document.addEventListener('keydown', e => {
-  if ($('#modal').classList.contains('open')) { if (e.key == 'Escape') $('#modal').classList.remove('open'); return; }
+  if ($('#modal').classList.contains('open')) { if (e.key == 'Escape') { modalGen++; $('#modal').classList.remove('open'); } return; }
   if (e.target.tagName == 'INPUT') { if (e.key == 'Escape') e.target.blur(); return; }
   if (e.ctrlKey && e.key == 'e') { e.preventDefault(); setPanel('side', app.classList.contains('noside')); return; }
   if (e.ctrlKey && e.key == 'g') { e.preventDefault(); setPanel('detail', app.classList.contains('nodetail')); return; }
