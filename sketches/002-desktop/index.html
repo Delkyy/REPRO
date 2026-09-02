@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>REPRO — sketch 002 desktop</title>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;900&family=Sora:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0C0C0D;--bg2:#111214;--panel:#18191B;--panel2:#1F2023;--line:#2C2E31;--fg:#F2F2F2;--muted:#9A9DA3;--accent:#FF2D6F;--accent2:#00E5FF;--radius:6px;--display:"Unbounded",sans-serif;--font:"Sora",system-ui,sans-serif;--mono:"JetBrains Mono",monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:13px;overflow:hidden;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+img{display:block}
+kbd{font-family:var(--mono);font-size:10px;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--muted)}
+
+/* ---- frame: rail | side | main | detail ---- */
+.app{display:grid;grid-template-columns:52px 210px minmax(0,1fr) 380px;grid-template-rows:40px 46px minmax(0,1fr);height:100%;transition:grid-template-columns .2s}
+.app.noside{grid-template-columns:52px 0 minmax(0,1fr) 380px}
+.app.nodetail{grid-template-columns:52px 210px minmax(0,1fr) 0}
+.app.noside.nodetail{grid-template-columns:52px 0 minmax(0,1fr) 0}
+.menubar{grid-row:1;grid-column:1/-1;display:flex;align-items:center;gap:2px;padding:0 8px;background:#000;font-size:12px;color:var(--muted);-webkit-app-region:drag}
+.menubar .wm{font-family:var(--display);font-weight:900;font-size:13px;letter-spacing:.14em;margin-right:14px;color:var(--fg)}
+.menubar .wm b{color:var(--accent)}
+.menubar button{padding:4px 9px;border-radius:4px}
+.menubar button:hover{background:var(--panel);color:var(--fg)}
+.menubar .sp{flex:1}
+.menubar .win button{width:34px;font-size:14px}
+
+/* top bar: search, view, counters */
+.top{grid-row:2;grid-column:3/4;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid var(--line);background:var(--bg2)}
+.search{flex:1;max-width:460px;display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px;color:var(--muted)}
+.search input{flex:1;background:none;border:0;color:var(--fg);outline:0;font:inherit;min-width:0}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);font-family:var(--mono);font-size:11px;color:var(--fg)}
+.chip b{color:var(--accent2)}
+.chip i{font-style:normal;color:var(--muted);cursor:pointer}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{padding:5px 10px;color:var(--muted);font-size:12px}
+.seg button.on{background:var(--panel2);color:var(--fg)}
+.top .count{color:var(--muted);font-family:var(--mono);font-size:11px;margin-left:auto}
+.icon{width:30px;height:30px;border-radius:6px;display:grid;place-items:center;border:1px solid var(--line);color:var(--muted)}
+.icon:hover{color:var(--fg);border-color:var(--muted)}
+.icon.couch{background:var(--accent);color:#fff;border-color:transparent;width:auto;padding:0 12px;font-weight:700;gap:6px}
+
+/* rail */
+.rail{grid-row:2/4;grid-column:1;background:#000;display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:4px;border-right:1px solid var(--line)}
+.rail button{width:36px;height:36px;border-radius:8px;display:grid;place-items:center;color:var(--muted);font-size:15px;position:relative}
+.rail button.on{background:var(--panel2);color:var(--fg)}
+.rail button.on::before{content:'';position:absolute;left:-8px;top:8px;bottom:8px;width:3px;background:var(--accent);border-radius:2px}
+.rail button:hover{color:var(--fg)}
+.rail .sp{flex:1}
+.rail .n{position:absolute;top:2px;right:2px;font-family:var(--mono);font-size:8px;background:var(--accent2);color:#000;border-radius:3px;padding:0 3px;font-weight:700}
+
+/* side */
+.side{grid-row:2/4;grid-column:2;background:var(--bg2);border-right:1px solid var(--line);overflow:auto;overflow-x:hidden;padding:10px 8px;min-width:0}
+.side details{margin-bottom:6px}
+.side summary{list-style:none;display:flex;align-items:center;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:8px 8px 4px;cursor:pointer;user-select:none}
+.side summary::before{content:'▾';margin-right:6px;font-size:9px;transition:transform .15s}
+.side details:not([open]) summary::before{transform:rotate(-90deg)}
+.side summary .a{margin-left:auto;color:var(--accent);letter-spacing:0;text-transform:none;font-size:11px}
+.side .it{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border-radius:6px;color:var(--muted);white-space:nowrap;overflow:hidden}
+.side .it:hover{background:var(--panel);color:var(--fg)}
+.side .it.on{background:var(--panel);color:var(--fg);box-shadow:inset 3px 0 0 var(--sysc,var(--accent))}
+.side .it .lg{width:34px;height:16px;flex:none;background:var(--sysc,var(--muted));-webkit-mask:var(--m) center/contain no-repeat;mask:var(--m) center/contain no-repeat}
+.side .it .tx{flex:1;overflow:hidden;text-overflow:ellipsis}
+.side .it .n{font-family:var(--mono);font-size:10px;opacity:.7}
+.side .it .warn{width:6px;height:6px;border-radius:50%;background:#FFB000}
+
+/* main grid */
+.main{grid-row:3;grid-column:3;overflow:auto;padding:18px 20px;min-width:0}
+.main h2{font-family:var(--display);font-size:20px;font-weight:700;display:flex;align-items:center;gap:10px;margin-bottom:2px}
+.main h2 .lg{width:60px;height:22px;background:var(--fg);-webkit-mask:var(--m) center/contain no-repeat;mask:var(--m) center/contain no-repeat}
+.main .sub{color:var(--muted);margin-bottom:16px;font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--cw,150px),1fr));gap:14px}
+.card{position:relative;border-radius:var(--radius);overflow:hidden;background:var(--panel);aspect-ratio:3/4.2;cursor:pointer;border:1px solid var(--line);transition:transform .12s,box-shadow .12s}
+.card img{width:100%;height:100%;object-fit:cover}
+.card:hover,.card.sel{transform:translateY(-3px);box-shadow:0 0 0 2px var(--sysc,var(--accent)),0 16px 36px rgba(0,0,0,.6)}
+.card .noart{position:absolute;inset:0;padding:12px;display:flex;flex-direction:column;justify-content:flex-end;gap:4px;background:linear-gradient(160deg,var(--panel2),var(--panel));font-weight:700;line-height:1.15}
+.card .noart small{color:var(--muted);font-weight:400;font-size:11px}
+.card .noart .lg{width:54px;height:20px;background:var(--sysc);-webkit-mask:var(--m) left/contain no-repeat;mask:var(--m) left/contain no-repeat;opacity:.8;margin-bottom:auto}
+.card .sysb{position:absolute;left:0;bottom:0;right:0;height:3px;background:var(--sysc)}
+.card .over{position:absolute;inset:0;background:linear-gradient(transparent 45%,rgba(0,0,0,.9));opacity:0;transition:opacity .15s;display:flex;flex-direction:column;justify-content:flex-end;padding:10px}
+.card:hover .over{opacity:1}
+.card .over b{font-size:12px;line-height:1.2;text-shadow:0 1px 3px #000}
+.card .over .acts{display:flex;gap:6px;margin-top:8px}
+.card .over .acts button{height:28px;border-radius:6px;background:rgba(255,255,255,.12);backdrop-filter:blur(6px);padding:0 10px;font-weight:700;font-size:12px}
+.card .over .acts .p{background:var(--accent);color:#fff;flex:1}
+.card .over .acts .cog{width:28px;padding:0}
+.card .badge{position:absolute;top:8px;right:8px;font-family:var(--mono);font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:var(--accent2);color:#000}
+.card .fav{position:absolute;top:6px;left:8px;color:#FFD23F;text-shadow:0 1px 3px #000}
+.card .pb{position:absolute;left:0;right:0;bottom:3px;height:3px;background:rgba(0,0,0,.6)}
+.card .pb i{display:block;height:100%;background:#fff;opacity:.8}
+
+/* detail */
+.detail{grid-row:2/4;grid-column:4;border-left:1px solid var(--line);background:var(--bg2);overflow:auto;overflow-x:hidden;min-width:0;position:relative}
+.detail .banner{height:190px;position:relative;overflow:hidden;background:var(--panel)}
+.detail .banner .bd{position:absolute;inset:0;background-size:cover;background-position:center 30%;filter:blur(20px) brightness(.45) saturate(1.2);transform:scale(1.25)}
+.detail .banner::after{content:'';position:absolute;inset:0;background:linear-gradient(transparent 30%,var(--bg2))}
+.detail .banner .lg{position:absolute;top:14px;left:18px;width:70px;height:22px;background:var(--sysc);-webkit-mask:var(--m) left/contain no-repeat;mask:var(--m) left/contain no-repeat;z-index:1}
+.detail .banner .cog{position:absolute;top:10px;right:10px;z-index:1}
+.detail .head{display:flex;gap:14px;padding:0 18px;margin-top:-60px;position:relative;z-index:1;align-items:flex-end}
+.detail .cover{width:110px;flex:none;border-radius:4px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.6);background:var(--panel);aspect-ratio:3/4.2}
+.detail .cover img{width:100%;height:100%;object-fit:cover}
+.detail .head h3{font-family:var(--display);font-size:16px;font-weight:700;line-height:1.15;padding-bottom:4px}
+.playbar{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.playbar .play{background:var(--accent);color:#fff;font-weight:700;font-size:15px;padding:10px 22px;border-radius:6px;display:flex;align-items:center;gap:8px}
+.playbar .play:hover{filter:brightness(1.1)}
+.playbar .st{display:flex;flex-direction:column;font-size:11px;color:var(--muted);line-height:1.3}
+.playbar .st b{color:var(--fg);font-family:var(--mono);font-size:12px;font-weight:500}
+.links{display:flex;gap:4px;padding:8px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.links button{padding:5px 9px;border-radius:5px;color:var(--muted);font-size:12px}
+.links button:hover{background:var(--panel);color:var(--fg)}
+.tabs{display:flex;padding:0 18px;border-bottom:1px solid var(--line)}
+.tabs button{padding:10px 0;margin-right:18px;color:var(--muted);font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button.on{color:var(--fg);border-color:var(--accent)}
+.tabs button .n{font-family:var(--mono);font-size:10px;color:var(--muted);margin-left:4px}
+.pane{padding:14px 18px}
+.slot{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;border:1px solid var(--line);margin-bottom:6px;background:var(--panel)}
+.slot .sh{width:52px;height:34px;border-radius:3px;background:linear-gradient(135deg,#3a4a7a,#1f2b4d);flex:none}
+.slot.auto .sh{background:linear-gradient(135deg,#444,#222)}
+.slot .t{flex:1;min-width:0;line-height:1.2}
+.slot .t small{display:block;color:var(--muted);font-family:var(--mono);font-size:10px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot .act{display:flex;gap:4px;opacity:0}
+.slot:hover .act{opacity:1}
+.slot .act button{padding:3px 7px;border:1px solid var(--line);border-radius:4px;font-size:11px}
+.slot .act button:hover{border-color:var(--fg)}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 12px;font-size:12px;align-items:center}
+.kv span{color:var(--muted)}
+.kv code{font-family:var(--mono);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kv select,.kv input{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:5px;padding:4px 7px;font:inherit;font-size:12px;max-width:100%}
+.kv .ovr{font-family:var(--mono);font-size:9px;background:var(--accent2);color:#000;padding:1px 5px;border-radius:3px;margin-left:6px;font-weight:700}
+.btnrow{display:flex;gap:6px;margin-top:10px}
+.btnrow button{flex:1;padding:7px;border:1px solid var(--line);border-radius:6px;font-size:12px;font-weight:600}
+.btnrow button:hover{border-color:var(--fg)}
+.pane h5{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:14px 0 8px;display:flex}
+.pane h5 a{margin-left:auto;color:var(--accent);letter-spacing:0;text-transform:none;cursor:pointer}
+.hint{color:var(--muted);font-size:12px;line-height:1.5}
+
+/* status bar */
+.status{grid-column:3/-1;display:none}
+
+/* empty state */
+.empty{display:grid;place-items:center;height:70%;text-align:center}
+.empty .box{max-width:420px}
+.empty h3{font-family:var(--display);font-size:18px;margin-bottom:8px}
+.empty p{color:var(--muted);margin-bottom:16px;line-height:1.5}
+.empty .btns{display:flex;gap:8px;justify-content:center}
+.empty .btns button{padding:9px 14px;border:1px solid var(--line);border-radius:6px;font-weight:600}
+.empty .btns .p{background:var(--accent);border-color:transparent;color:#fff}
+
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--panel2);border:1px solid var(--line);padding:10px 16px;border-radius:8px;font-size:12px;opacity:0;transition:.2s;z-index:60;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.toast b{color:var(--accent2)}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="menubar">
+    <span class="wm">REP<b>RO</b></span>
+    <button>File</button><button>Edit</button><button>View</button><button>Emulators</button><button>Saves</button><button>Help</button>
+    <span class="sp"></span>
+    <span class="win"><button>–</button><button>▢</button><button>✕</button></span>
+  </div>
+
+  <nav class="rail">
+    <button class="on" title="Library">▦</button>
+    <button title="Continue">▶</button>
+    <button title="Favorites">★</button>
+    <button title="Saves">⛁</button>
+    <button title="Unsorted (1)">?<span class="n">1</span></button>
+    <span class="sp"></span>
+    <button title="Add anything (Ctrl+O)">+</button>
+    <button title="Settings">⚙</button>
+  </nav>
+
+  <aside class="side" id="side"></aside>
+
+  <div class="top">
+    <button class="icon" id="tSide" title="Toggle sidebar (Ctrl+E)">☰</button>
+    <label class="search">⌕ <input id="q" placeholder="search, or type sys:ps2 fav:yes"><kbd>Ctrl F</kbd></label>
+    <span class="chip">sys:<b>ps2</b> <i>✕</i></span>
+    <div class="seg"><button class="on" title="grid">▦</button><button title="list">☰</button><button title="big">▣</button></div>
+    <input type="range" min="110" max="220" value="150" id="zoom" style="width:80px;accent-color:var(--accent)" title="card size">
+    <span class="count" id="count">7 / 20</span>
+    <button class="icon" id="tDetail" title="Toggle details (Ctrl+G)">▥</button>
+    <button class="icon couch" title="Couch mode (Ctrl+2)">🎮 Couch</button>
+  </div>
+
+  <main class="main" id="main"></main>
+
+  <aside class="detail" id="detail"></aside>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const A='../art/', L='../../assets/systems/';
+const SYS={gc:{n:'GameCube',c:'#8F82D6',emu:'Dolphin'},ps1:{n:'PlayStation',c:'#5B93E6',emu:'DuckStation'},ps2:{n:'PlayStation 2',c:'#3D8BF2',emu:'PCSX2'},xbox:{n:'Xbox',c:'#3FB43F',emu:'xemu'},x360:{n:'Xbox 360',c:'#92C83E',emu:'xenia'},n64:{n:'Nintendo 64',c:'#F5B201',emu:null},snes:{n:'Super Nintendo',c:'#9A8CE8',emu:null}};
+const G=[
+ {t:'Super Mario Strikers',s:'gc',a:'G4QE01.png',pt:'6h 20m',last:'yesterday',fav:1,prog:.6},
+ {t:'Super Monkey Ball 2',s:'gc',a:'GM2E8P.png',pt:'1h 05m',last:'3 days ago',prog:.2},
+ {t:'Mario Golf: Toadstool Tour',s:'gc',a:'GFTE01.png',pt:'2h 40m',last:'last week',prog:.4},
+ {t:'NBA Street Vol. 2',s:'gc',a:'GNZE69.png',pt:'45m',last:'aug 12',prog:.1},
+ {t:'Harvest Moon: A Wonderful Life',s:'gc',a:'GYWEE9.png'},
+ {t:'True Crime: New York City',s:'gc',a:'G2CE52.png'},
+ {t:'Dragon Ball Z: Budokai Tenkaichi 3',s:'ps2',pt:'3h 10m',last:'2 days ago',fav:1,prog:.5},
+ {t:'EverQuest Online Adventures',s:'ps2',a:'SLUS-20470.png'},
+ {t:'EverQuest OA: Frontiers',s:'ps2',a:'SLUS-20744.jpg'},
+ {t:'Fullmetal Alchemist and the Broken Angel',s:'ps2',a:'Fullmetal_Alchemist_and_the_Broken_Angel.png',pt:'1h 55m',last:'aug 30',prog:.3},
+ {t:'Harvest Moon: AWL Special Edition',s:'ps2',a:'SLUS-21171.jpg',pt:'12h 08m',last:'today',fav:1,prog:.8,ovr:'RetroArch · pcsx2 core'},
+ {t:'The Sims 2',s:'ps2',a:'Sims_2.png',pt:'4h 30m',last:'aug 20',prog:.35},
+ {t:'The Sims 2: Castaway',s:'ps2',a:'Sims_2-Castaway.png'},
+ {t:'Metal Gear Solid',s:'ps1',pt:'45m',last:'jul 1',prog:.15},
+ {t:'Persona',s:'ps1',a:'persona.png'},
+ {t:'Persona 2: Innocent Sin',s:'ps1',pt:'1h 24m',last:'aug 4',prog:.25},
+ {t:'Madden NFL 07',s:'xbox',a:'Madden_NFL_07.png',pt:'8h 15m',last:'aug 28',fav:1,prog:.7},
+ {t:'ESPN NFL 2K5',s:'xbox',a:'ESPN_NFL_2K5.png',pt:'22h 40m',last:'today',fav:1,prog:.9},
+ {t:'Buffy the Vampire Slayer',s:'xbox',a:'Buffy_the_Vampire_Slayer.png'},
+ {t:'JSRF: Jet Set Radio Future',s:'xbox',pt:'30m',last:'jul 19',prog:.05},
+];
+G.forEach((g,i)=>g.id=i);
+const $=s=>document.querySelector(s), app=$('#app');
+let filter='ps2', sel=10, tab='saves', empty=false;
+const m=k=>`--m:url('${L}${k}.svg')`;
+const sysc=k=>`--sysc:${SYS[k].c}`;
+let tt;const toast=h=>{const t=$('#toast');t.innerHTML=h;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),2600)};
+
+function side(){
+  const cnt={};G.forEach(g=>cnt[g.s]=(cnt[g.s]||0)+1);
+  const it=(f,k,txt,n,extra='')=>`<button class="it ${filter==f?'on':''}" data-f="${f}" style="${k?sysc(k)+';'+m(k):''}">${k?'<span class="lg"></span>':''}<span class="tx">${txt}</span>${extra}<span class="n">${n??''}</span></button>`;
+  $('#side').innerHTML=`
+  <details open><summary>Systems<span class="a">+</span></summary>
+    ${it('all',null,'All systems',G.length)}
+    ${Object.keys(SYS).filter(k=>cnt[k]).map(k=>it(k,k,SYS[k].n,cnt[k])).join('')}
+    ${it('n64','n64','Nintendo 64',0,'<span class="warn" title="no emulator"></span>')}
+  </details>
+  <details open><summary>Views<span class="a">save</span></summary>
+    ${it('v1',null,'Football',4)}${it('v2',null,'Beat it ✓',2)}${it('v3',null,'Never played',9)}
+  </details>
+  <details><summary>Emulators</summary>
+    ${['dolphin','pcsx2','duckstation','xemu','xenia'].map(e=>`<button class="it" data-f="e:${e}" style="--m:url('${L}${e}.svg')"><span class="lg" style="background:var(--muted)"></span><span class="tx">${e}</span></button>`).join('')}
+  </details>`;
+  $('#side').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{filter=b.dataset.f;render()});
+}
+function list(){ if(empty)return[]; if(filter=='all'||filter.startsWith('v')||filter.startsWith('e:'))return G; return G.filter(g=>g.s==filter); }
+function main(){
+  const l=list();
+  $('#count').textContent=`${l.length} / ${G.length}`;
+  if(!l.length){
+    const hasEmu=SYS[filter]?.emu;
+    const msg=hasEmu?`REPRO found ${hasEmu} but nothing to run on it.<br>point it at a folder, or make one in the REPRO folder and drop roms in.`:`no emulator set up for this system yet.<br>add one, or drop roms in anyway for when you do.`;
+    $('#main').innerHTML=`<div class="empty"><div class="box"><h3>no ${SYS[filter]?.n||''} games yet</h3><p>${msg}</p><div class="btns">${hasEmu?'<button class="p">add rom folder…</button>':'<button class="p">add emulator…</button>'}<button>create roms/${filter}/</button><button>what files work?</button></div></div></div>`; return; }
+  const name=SYS[filter]?`<span class="lg" style="${m(filter)}"></span>${SYS[filter].n}`:filter=='all'?'All games':{v1:'Football',v2:'Beat it',v3:'Never played'}[filter]||filter.slice(2);
+  $('#main').innerHTML=`<h2>${name}</h2><div class="sub">${l.length} games${SYS[filter]?` · ${SYS[filter].emu} · <a style="color:var(--accent2)">bios ok</a>`:''}</div><div class="grid">${l.map(g=>`
+   <div class="card ${sel==g.id?'sel':''}" data-id="${g.id}" style="${sysc(g.s)};${m(g.s)}">
+     ${g.a?`<img src="${A+g.a}">`:`<div class="noart"><span class="lg"></span>${g.t}<small>no art yet · click to scrape</small></div>`}
+     ${g.fav?'<span class="fav">★</span>':''}${g.ovr?'<span class="badge">ALT EMU</span>':''}
+     ${g.prog?`<div class="pb"><i style="width:${g.prog*100}%"></i></div>`:''}<div class="sysb"></div>
+     <div class="over"><b>${g.t}</b><div class="acts"><button class="p">▶ Play</button><button class="cog" title="game settings">⚙</button></div></div>
+   </div>`).join('')}</div>`;
+  $('#main').querySelectorAll('.card').forEach(c=>{c.onclick=e=>{sel=+c.dataset.id;if(e.target.classList.contains('cog'))tab='launch';if(e.target.classList.contains('p'))return toast(`launching <b>${G[sel].t}</b>`);render();app.classList.remove('nodetail')}});
+}
+function detail(){
+  const g=G[sel]; if(!g){$('#detail').innerHTML='';return}
+  const s=SYS[g.s];
+  const panes={
+   saves:`<div class="slot auto"><div class="sh"></div><div class="t">Auto · before last launch<small>today 14:02 · memcard 8kb</small></div><div class="act"><button>restore</button><button>⋯</button></div></div>
+     <div class="slot"><div class="sh"></div><div class="t">before boss<small>aug 28 · 19:41</small></div><div class="act"><button>restore</button><button>rename</button><button>⋯</button></div></div>
+     <div class="slot"><div class="sh"></div><div class="t">slot 1<small>aug 30 · 22:10</small></div><div class="act"><button>restore</button><button>rename</button><button>⋯</button></div></div>
+     <div class="btnrow"><button>+ snapshot now</button><button>open save folder</button></div>
+     <h5>Save states <a>from ${s.emu}</a></h5><div class="hint">2 states · last: resume, aug 30. these are the emulator's own, REPRO just shows them.</div>`,
+   launch:`<div class="kv">
+     <span>emulator</span><div><select><option>${s.emu} (system default)</option><option selected>RetroArch · pcsx2 core</option><option>custom…</option></select>${g.ovr?'<span class="ovr">OVERRIDE</span>':''}</div>
+     <span>args</span><input value='-batch -fullscreen "{rom}"'>
+     <span>rom</span><code title="">Harvest Moon - A Wonderful Life - Special Edition (USA).iso</code>
+     <span>saves from</span><code>memcards/SLUS-21171.ps2 (per-game)</code>
+     <span>before launch</span><label><input type="checkbox" checked style="width:auto"> auto-snapshot saves</label>
+   </div><div class="btnrow"><button>test launch</button><button>reset to default</button></div>`,
+   info:`<div class="kv"><span>title</span><input value="${g.t}"><span>year</span><input value="2005"><span>players</span><input value="1"><span>genre</span><input value="Farming, Life sim"><span>serial</span><code>SLUS-21171</code></div>
+     <div class="btnrow"><button>scrape metadata…</button><button>pick art…</button></div><h5>Description</h5><div class="hint">The GameCube farm life game, ported with an extra bachelorette, more crops and a few bugs fixed. The version to play.</div>`,
+  };
+  $('#detail').innerHTML=`
+   <div class="banner" style="${sysc(g.s)};${m(g.s)}"><div class="bd" style="background-image:url('${g.a?A+g.a:''}')"></div><span class="lg"></span><button class="icon cog" title="game settings">⚙</button></div>
+   <div class="head"><div class="cover">${g.a?`<img src="${A+g.a}">`:''}</div><h3>${g.t}</h3></div>
+   <div class="playbar"><button class="play" onclick="toast('launching <b>${g.t}</b> with ${g.ovr||s.emu}')">▶ Play</button>
+     <div class="st"><span>last played</span><b>${g.last||'never'}</b></div><div class="st"><span>playtime</span><b>${g.pt||'—'}</b></div><div class="st"><span>saves</span><b>3 slots</b></div></div>
+   <div class="links"><button>★ ${g.fav?'unfavorite':'favorite'}</button><button>▣ folder</button><button>⛁ saves</button><button>✎ edit</button><button>⋯</button></div>
+   <div class="tabs">${['saves','launch','info'].map(t=>`<button class="${tab==t?'on':''}" data-t="${t}">${t}${t=='saves'?'<span class="n">3</span>':''}${t=='launch'&&g.ovr?'<span class="n" style="color:var(--accent2)">alt</span>':''}</button>`).join('')}</div>
+   <div class="pane">${panes[tab]}</div>`;
+  $('#detail').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;detail()});
+}
+function render(){side();main();detail()}
+$('#tSide').onclick=()=>app.classList.toggle('noside');
+$('#tDetail').onclick=()=>app.classList.toggle('nodetail');
+$('#zoom').oninput=e=>document.documentElement.style.setProperty('--cw',e.target.value+'px');
+document.addEventListener('keydown',e=>{ if(e.ctrlKey&&e.key=='e'){e.preventDefault();app.classList.toggle('noside')} if(e.ctrlKey&&e.key=='g'){e.preventDefault();app.classList.toggle('nodetail')} if(e.ctrlKey&&e.key=='f'){e.preventDefault();$('#q').focus()} });
+const P=new URLSearchParams(location.search);
+if(P.get('f'))filter=P.get('f'); if(P.get('tab'))tab=P.get('tab'); if(P.get('empty')){empty=true;filter='n64'} if(P.get('noside'))app.classList.add('noside'); if(P.get('nodetail'))app.classList.add('nodetail');
+try{ render(); }catch(e){ document.body.insertAdjacentHTML('afterbegin', `<pre style="position:fixed;inset:0;z-index:999;background:#300;color:#fff;padding:20px;white-space:pre-wrap;font-size:14px">${e.stack}</pre>`); }
+</script>
+</body>
+</html>
