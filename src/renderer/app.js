@@ -414,7 +414,7 @@ function pollPad() {
   if (gp && app.classList.contains('couch') && !$('#modal').classList.contains('open')) {
     const b = i => gp.buttons[i]?.pressed, ax = gp.axes;
     const sx = readStickAxis(ax[0], 'x'), sy = readStickAxis(ax[1], 'y');
-    const now = { up: b(12) || sy < 0, down: b(13) || sy > 0, left: b(14) || sx < 0, right: b(15) || sx > 0, a: b(0), bb: b(1), x: b(2), y: b(3), sel: b(8), start: b(9) };
+    const now = { up: b(12) || sy < 0, down: b(13) || sy > 0, left: b(14) || sx < 0, right: b(15) || sx > 0, a: b(0), bb: b(1), x: b(2), y: b(3), sel: b(8), start: b(9) }; // sel=Select(8), start=Start(9)
     const edge = k => now[k] && !padPrev[k];
     if (guideOpen) {
       // guide nav: up/down moves in right panel, left/right changes section, A selects, B/start closes
@@ -434,8 +434,8 @@ function pollPad() {
       // 28 frames (~470ms) before repeat starts, then one step every 9 frames (~150ms) — a quick flick moves exactly one
       const rep = (k, key) => { if (now[k] && (edge(k) || (padHeld > 28 && padHeld % 9 == 0))) cKey(key); };
       rep('up', 'ArrowUp'); rep('down', 'ArrowDown'); rep('left', 'ArrowLeft'); rep('right', 'ArrowRight');
-      if (edge('a')) cOpen(); if (edge('x')) cKey('x'); if (edge('y')) cKey('y'); if (edge('sel')) setMode('desktop');
-      if (edge('start')) openGuide();
+      if (edge('a')) cOpen(); if (edge('x')) cKey('x'); if (edge('y')) cKey('y'); if (edge('start')) setMode('desktop');
+      if (edge('sel')) openGuide();
     }
     padHeld = (now.up || now.down || now.left || now.right) ? padHeld + 1 : 0;
     padPrev = now;
@@ -482,12 +482,11 @@ async function renderGuide(g) {
     <div class="scrim" id="guideScrim"></div>
     <div class="box">
       <div class="left">
-        <div class="gtime">${time}</div>
-        <div class="gdate">${date}</div>
-        <div class="gsep"></div>
-        ${leftItems}
-        <div class="gsep" style="margin-top:auto"></div>
-        <div class="gitem acc" data-sec="power"><span class="ico">⏻</span>Quit REPRO</div>
+        <div class="gclockrow">
+          <div class="gtime">${time}</div>
+          <div class="gdate">${date}</div>
+        </div>
+        <div class="gtabs">${leftItems}</div>
       </div>
       <div class="right" id="guideRight"></div>
     </div>`;
