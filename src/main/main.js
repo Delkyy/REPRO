@@ -23,7 +23,7 @@ const SYSTEMS = Object.fromEntries(Object.entries(SYSDB).map(([k, v]) => [k, v.n
 const readJson = (p, fallback) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return fallback; } };
 const writeJson = (p, v) => fs.writeFileSync(p, JSON.stringify(v, null, 2));
 
-let config = readJson(P.config, { emulators: {}, romDirs: [], mode: 'desktop', ui: 'desk', theme: 'billet', views: [], panels: { side: true, detail: true }, cardSize: 150, hubKey: 'Shift+F12' });
+let config = readJson(P.config, { emulators: {}, romDirs: [], mode: 'desktop', ui: 'desk', theme: 'billet', views: [], panels: { side: true, detail: true }, cardSize: 150, hubKey: 'Ctrl+Alt+H' });
 let library = readJson(P.library, { games: {} }); // keyed by rom path
 const saveConfig = () => writeJson(P.config, config);
 const saveLibrary = () => writeJson(P.library, library);
@@ -173,7 +173,7 @@ function emuFolders(id, e) {
 function snapshot() {
   const emus = {};
   for (const [id, e] of Object.entries(config.emulators)) emus[id] = { ...e, name: recipes[id]?.name || id, systems: recipes[id]?.systems || [], exeDir: e.exe ? path.dirname(e.exe) : null, folders: emuFolders(id, e) };
-  return { games: Object.values(library.games), unsorted: library.unsorted || [], emulators: emus, systems: SYSTEMS, sysdb: SYSDB, root: ROOT, recipeArgs: Object.fromEntries(Object.entries(recipes).map(([k, r]) => [k, r.args])), config: { mode: config.mode, ui: config.ui, theme: config.theme, romDirs: config.romDirs, views: config.views || [], panels: config.panels || { side: true, detail: true }, cardSize: config.cardSize || 150, hubKey: config.hubKey || 'Shift+F12' } };
+  return { games: Object.values(library.games), unsorted: library.unsorted || [], emulators: emus, systems: SYSTEMS, sysdb: SYSDB, root: ROOT, recipeArgs: Object.fromEntries(Object.entries(recipes).map(([k, r]) => [k, r.args])), config: { mode: config.mode, ui: config.ui, theme: config.theme, romDirs: config.romDirs, views: config.views || [], panels: config.panels || { side: true, detail: true }, cardSize: config.cardSize || 150, hubKey: config.hubKey || 'Ctrl+Alt+H', hubKeyOk: hubKeyOk } };
 }
 // duplicates: same title across different systems isn't a dupe, but same title+sys with a different path is
 function findDuplicates() {
@@ -241,7 +241,7 @@ function buildMenu() {
       { label: 'Desktop mode', accelerator: 'CmdOrCtrl+1', click: () => send('menu', 'mode', 'desktop') },
       { label: 'Couch mode', accelerator: 'CmdOrCtrl+2', click: () => send('menu', 'mode', 'couch') },
       { type: 'separator' },
-      { label: `Close running game (${config.hubKey || 'Shift+F12'})`, click: () => { killRunning(); } },
+      { label: `Close running game (${config.hubKey || 'Ctrl+Alt+H'}${hubKeyOk ? '' : ' — NOT REGISTERED'})`, click: () => { killRunning(); } },
       { label: 'Change hub key…', click: () => send('menu', 'hubkey') },
       { type: 'separator' },
       { label: 'Theme', submenu: themes.map(t => ({ label: readJson(path.join(P.themes, t, 'theme.json'), {}).name || t, click: () => send('menu', 'theme', t) })) },
@@ -273,15 +273,20 @@ function createWindow() {
   buildMenu();
   registerHubKey();
 }
+let hubKeyOk = false;
 function registerHubKey() {
   globalShortcut.unregisterAll();
+  const key = config.hubKey || 'Ctrl+Alt+H';
   try {
-    globalShortcut.register(config.hubKey || 'Shift+F12', () => {
+    hubKeyOk = globalShortcut.register(key, () => {
       if (!running) { win?.show(); win?.focus(); return; }
       killRunning();
-      send('menu', 'toast', `closed the game via ${config.hubKey || 'Shift+F12'}`);
+      send('menu', 'toast', `closed the game via ${key}`);
     });
-  } catch (e) { console.error('hub key registration failed', e); }
+  } catch (e) { hubKeyOk = false; }
+  if (!hubKeyOk) console.error(`hub key "${key}" is already claimed by another app (Steam, Nvidia overlay, Windows itself, etc). pick a different combo.`);
+  buildMenu();
+  return hubKeyOk;
 }
 app.whenReady().then(() => { if (!process.argv.includes('--smoke')) createWindow(); });
 app.on('window-all-closed', () => app.quit());
@@ -313,4 +318,4 @@ ipcMain.handle('removeView', (_, id) => { config.views = (config.views || []).fi
 ipcMain.handle('createSystemFolder', (_, sys) => { const p = path.join(ROOT, 'roms', sys); fs.mkdirSync(p, { recursive: true }); if (!config.romDirs.some(r => r.path === p)) { config.romDirs.push({ path: p, system: sys }); saveConfig(); } shell.openPath(p); return snapshot(); });
 ipcMain.handle('killRunning', () => killRunning());
 ipcMain.handle('isRunning', () => !!running);
-ipcMain.handle('setHubKey', (_, key) => { config.hubKey = key; saveConfig(); registerHubKey(); buildMenu(); return config.hubKey; });
+ipcMain.handle('setHubKey', (_, key) => { const prev = config.hubKey; config.hubKey = key; const ok = registerHubKey(); if (!ok) config.hubKey = prev; saveConfig(); return { ok, key: config.hubKey }; });

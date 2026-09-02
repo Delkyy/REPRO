@@ -246,7 +246,7 @@ async function openSettings() {
     <h5>Emulators</h5>${emuRows || '<div class="hint">none found.</div>'}<button class="btnrow" id="mAddExe" style="margin-top:8px;display:block;padding:7px 12px;border:1px solid var(--line);border-radius:6px">add exe…</button>
     <h5 style="margin-top:16px">Rom folders</h5>${dirRows || '<div class="hint">none yet.</div>'}<button id="mAddDir" style="margin-top:8px;display:block;padding:7px 12px;border:1px solid var(--line);border-radius:6px">+ add folder…</button>
     <h5 style="margin-top:16px">Config</h5><div class="hint">everything lives next to the app: ${esc(ROOT)}</div>
-    <h5 style="margin-top:16px">Hub key</h5><div class="hint">press <code style="background:var(--panel);padding:2px 6px;border-radius:4px">${esc(S.config.hubKey || 'Shift+F12')}</code> anywhere, even with the emulator focused, to close the running game and jump back to REPRO. map a controller's Guide/Home button to it in Windows or Steam Input for a one-button "back to hub". <button id="mHubKey" style="margin-top:6px;display:block;padding:6px 10px;border:1px solid var(--line);border-radius:6px">change…</button></div>
+    <h5 style="margin-top:16px">Hub key</h5><div class="hint">press <code style="background:var(--panel);padding:2px 6px;border-radius:4px">${esc(S.config.hubKey || 'Ctrl+Alt+H')}</code>${S.config.hubKeyOk === false ? ' <b style="color:var(--accent2)">— not registered, another app has this combo</b>' : ''} anywhere, even with the emulator focused, to close the running game and jump back to REPRO. map a controller's Guide/Home button to it in Windows or Steam Input for a one-button "back to hub". <button id="mHubKey" style="margin-top:6px;display:block;padding:6px 10px;border:1px solid var(--line);border-radius:6px">change…</button></div>
     </div></div>`;
   $('#mClose').onclick = () => $('#modal').classList.remove('open');
   $('#modal').querySelectorAll('[data-exe]').forEach(b => b.onclick = async () => { const found2 = b.dataset.found; const p = found2 || await repro.pickExe(); if (p) { S = await repro.setEmulator({ id: b.dataset.exe, exe: p }); openSettings(); } });
@@ -284,11 +284,21 @@ repro.onMenu((cmd, arg) => {
      toast: () => toast(arg), hubkey: changeHubKey })[cmd]?.();
 });
 async function changeHubKey() {
-  const cur = S.config.hubKey || 'Shift+F12';
-  const k = prompt(`key combo to close the running game and jump back to REPRO, from anywhere (even while the emulator has focus).\nexamples: Shift+F12, Ctrl+Alt+Q, F13\n\ncurrent: ${cur}`, cur);
-  if (!k) return;
-  const newKey = await repro.setHubKey(k);
-  S.config.hubKey = newKey; toast(`hub key set to <b>${esc(newKey)}</b>. map your controller's Guide/Home button to this in Windows or Steam Input to trigger it from the pad.`);
+  const cur = S.config.hubKey || 'Ctrl+Alt+H';
+  $('#modal').innerHTML = `<div class="box"><div class="mh"><h3>Hub key</h3><button class="icon" id="mClose">✕</button></div><div class="mb">
+    <div class="hint">key combo to close the running game and jump back to REPRO, from anywhere — even while the emulator has focus. examples: Ctrl+Alt+H, Ctrl+Shift+Q, F13.</div>
+    <div class="kv" style="margin-top:12px"><span>key</span><input id="hkInput" value="${esc(cur)}" style="max-width:220px"></div>
+    <div class="hint" id="hkMsg" style="margin-top:8px"></div>
+    <div class="btnrow" style="margin-top:12px"><button id="hkSave" style="background:var(--accent);color:#fff;border-color:transparent">save</button></div>
+    </div></div>`;
+  $('#mClose').onclick = () => $('#modal').classList.remove('open');
+  $('#hkSave').onclick = async () => {
+    const key = $('#hkInput').value.trim(); if (!key) return;
+    const r = await repro.setHubKey(key);
+    if (r.ok) { S.config.hubKey = r.key; toast(`hub key set to <b>${esc(r.key)}</b>. map your controller's Guide/Home button to this in Windows or Steam Input to trigger it from the pad.`); $('#modal').classList.remove('open'); }
+    else { $('#hkMsg').innerHTML = `<b style="color:var(--accent2)">"${esc(key)}" is already claimed by another app (Steam, Nvidia overlay, Windows, etc). kept <b>${esc(S.config.hubKey)}</b>. try a different combo.</b>`; }
+  };
+  $('#modal').classList.add('open');
 }
 document.addEventListener('keydown', e => {
   if ($('#modal').classList.contains('open')) { if (e.key == 'Escape') $('#modal').classList.remove('open'); return; }
