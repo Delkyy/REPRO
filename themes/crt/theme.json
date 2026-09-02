@@ -1,5 +1,7 @@
 {
   "name": "CRT",
   "author": "REPRO",
-  "description": "green phosphor + scanlines"
+  "description": "green phosphor and scanlines.",
+  "swatch": "#3DFF7A",
+  "source": "docs/research-identities.md"
 }

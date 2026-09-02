@@ -1,0 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@700;900&family=Sora:wght@400;600;700&display=swap');
+:root {
+  --bg:#0C0C0D; --bg2:#111214; --panel:#18191B; --line:#2C2E31;
+  --fg:#F2F2F2; --muted:#9A9DA3; --accent:#FF2D6F; --accent2:#00E5FF;
+  --radius:6px; --display:"Unbounded",sans-serif; --font:"Sora",system-ui,sans-serif; --mono:"JetBrains Mono",monospace;
+}

@@ -1,6 +1,0 @@
-:root {
-  --bg:#f3efe6; --bg2:#ece6d8; --panel:#fffdf7; --line:#d9d1bf;
-  --fg:#1d1a14; --muted:#7a7263; --accent:#c8321f; --accent2:#e58f1f;
-  --radius:14px; --font:"Inter",system-ui,sans-serif; --mono:"JetBrains Mono",monospace;
-  --card-glow:0 0 0 3px var(--accent), 0 14px 30px rgba(60,40,10,.25);
-}

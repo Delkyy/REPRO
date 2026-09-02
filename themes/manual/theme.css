@@ -1,0 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Sans:wght@400;600;700&display=swap');
+:root {
+  --bg:#151311; --bg2:#1B1815; --panel:#211E1A; --line:#3A342D;
+  --fg:#F4EBD9; --muted:#B5A88F; --accent:#FF5A1F; --accent2:#FFD23F;
+  --radius:4px; --display:"Archivo Black",sans-serif; --font:"IBM Plex Sans",system-ui,sans-serif; --mono:"JetBrains Mono",monospace;
+}

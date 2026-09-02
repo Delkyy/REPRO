@@ -25,7 +25,7 @@ const SYSTEMS = {
 const readJson = (p, fallback) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return fallback; } };
 const writeJson = (p, v) => fs.writeFileSync(p, JSON.stringify(v, null, 2));
 
-let config = readJson(P.config, { emulators: {}, romDirs: [], mode: 'desktop', ui: 'desk', theme: 'slate' });
+let config = readJson(P.config, { emulators: {}, romDirs: [], mode: 'desktop', ui: 'desk', theme: 'billet' });
 let library = readJson(P.library, { games: {} }); // keyed by rom path
 const saveConfig = () => writeJson(P.config, config);
 const saveLibrary = () => writeJson(P.library, library);
@@ -222,4 +222,5 @@ ipcMain.handle('pickExe', async () => { const r = await dialog.showOpenDialog(wi
 ipcMain.handle('showInFolder', (_, p) => shell.showItemInFolder(p));
 ipcMain.handle('fullscreen', (_, on) => win.setFullScreen(on));
 ipcMain.handle('root', () => ROOT);
+ipcMain.handle('themes', () => fs.readdirSync(P.themes).filter(d => fs.existsSync(path.join(P.themes, d, 'theme.json'))).map(d => ({ id: d, ...readJson(path.join(P.themes, d, 'theme.json'), {}) })));
 ipcMain.handle('detectOne', (_, exe) => { const r = recipeForExe(exe); return r ? { recipe: r.id, name: r.name, exe } : null; });

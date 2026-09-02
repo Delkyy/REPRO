@@ -1,7 +1,7 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 :root {
-  --bg:#050806; --bg2:#0a120c; --panel:#0d1a10; --line:#173a20;
-  --fg:#c9ffd0; --muted:#5fa66a; --accent:#39ff6a; --accent2:#ffe45c;
-  --radius:2px; --font:"JetBrains Mono",monospace; --mono:"JetBrains Mono",monospace;
-  --card-glow:0 0 0 2px var(--accent), 0 0 30px rgba(57,255,106,.35);
+  --bg:#070B08; --bg2:#0B120D; --panel:#0F1712; --line:#1E2B22;
+  --fg:#E6F5E9; --muted:#8FB59B; --accent:#3DFF7A; --accent2:#FFB000;
+  --radius:2px; --display:"Space Grotesk",sans-serif; --font:"JetBrains Mono",monospace; --mono:"JetBrains Mono",monospace;
 }
 body::after{content:"";position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 2px,transparent 2px 4px);z-index:99}

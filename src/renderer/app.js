@@ -2,7 +2,8 @@
 const $ = s => document.querySelector(s), body = document.body;
 let S = { games: [], unsorted: [], emulators: {}, systems: {}, config: {} };
 let filter = 'all', sel = null, focus = 0, couchList = [], rowsMeta = [], ROOT = '';
-const THEMES = ['slate', 'crt', 'paper'];
+let THEMES = [];
+const sysc = k => `style="--sysc:var(--sys-${k})"`;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fileUrl = p => 'file:///' + p.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/');
 const fmtPt = s => !s ? '—' : s < 3600 ? `${Math.round(s / 60)}m` : `${Math.floor(s / 3600)}h ${Math.round((s % 3600) / 60)}m`;
@@ -20,7 +21,7 @@ function renderSide() {
   const counts = {}; S.games.forEach(g => counts[g.sys] = (counts[g.sys] || 0) + 1);
   const B = (f, ico, txt, n, dot) => `<button data-f="${f}" class="${filter == f ? 'on' : ''}"><span class="ico">${ico}</span>${dot ? `<span class="dot ${dot}"></span>` : ''}<span class="txt">${txt}</span><span class="n">${n}</span></button>`;
   let h = `<h4>Library</h4>${B('all', '▦', 'All games', S.games.length)}${B('recent', '▶', 'Continue', Math.min(6, played().length))}${B('fav', '★', 'Favorites', S.games.filter(g => g.fav).length)}<h4>Systems</h4>`;
-  for (const k of Object.keys(S.systems)) if (counts[k]) h += B(k, k.toUpperCase().slice(0, 3), sysName(k), counts[k], hasEmu(k) ? 'ok' : 'warn');
+  for (const k of Object.keys(S.systems)) if (counts[k]) h += B(k, k.toUpperCase().slice(0, 3), sysName(k), counts[k], hasEmu(k) ? 'ok' : 'warn').replace('<button', `<button ${sysc(k)}`);
   h += `<h4>Needs you</h4>${B('unsorted', '?', 'Unsorted', S.unsorted.length, S.unsorted.length ? 'warn' : 'ok')}`;
   $('#side').innerHTML = h;
   $('#side').querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filter = b.dataset.f; renderSide(); renderGrid(); });
@@ -48,18 +49,19 @@ function renderGrid() {
   $('#grid').style.display = 'grid';
   $('#sub').textContent = `${l.length} games${S.systems[filter] ? ' · ' + emuName(filter) : ''}`;
   if (!l.length) $('#grid').innerHTML = `<div class="hint-empty">no games yet. hit <b>+</b> up top and point REPRO at a rom folder.</div>`;
-  else $('#grid').innerHTML = l.map(g => `<div class="card ${sel == g.id ? 'sel' : ''}" data-id="${esc(g.id)}">${artEl(g)}<span class="tag">${esc(g.sys.toUpperCase())}</span>${g.fav ? '<span class="fav">★</span>' : ''}${g.playtime ? `<span class="pt">${fmtPt(g.playtime)}</span>` : ''}</div>`).join('');
+  else $('#grid').innerHTML = l.map(g => `<div class="card ${sel == g.id ? 'sel' : ''}" data-id="${esc(g.id)}" ${sysc(g.sys)}>${artEl(g)}<span class="tag">${esc(g.sys.toUpperCase())}</span>${g.fav ? '<span class="fav">★</span>' : ''}${g.playtime ? `<span class="pt">${fmtPt(g.playtime)}</span>` : ''}</div>`).join('');
   $('#grid').querySelectorAll('.card').forEach(c => { c.onclick = () => { sel = c.dataset.id; renderGrid(); renderDetail(); $('#detail').classList.add('open'); }; c.ondblclick = () => launch(c.dataset.id); });
 }
 function renderDetail() {
   const g = byId(sel); if (!g) { $('#detail').innerHTML = '<div class="empty">pick a game</div>'; return; }
   const emu = emuName(g.sys), ok = hasEmu(g.sys);
+  $('#detail').style.cssText = `--sysc:var(--sys-${g.sys})`;
   $('#detail').innerHTML = `
   <button class="icon close" id="dClose">✕</button>
   <div class="hero">${g.art ? `<img src="${fileUrl(g.art)}">` : ''}<div class="cover">${artEl(g)}</div></div>
   <div class="body">
     <h3>${esc(g.title)}</h3>
-    <div class="meta"><span>${esc(sysName(g.sys))}</span><span>${fmtPt(g.playtime)} played</span><span>last: ${fmtLast(g.lastPlayed)}</span></div>
+    <div class="badges"><span class="badge sys">${esc(sysName(g.sys))}</span><span class="badge">${fmtPt(g.playtime)} played</span><span class="badge">last ${fmtLast(g.lastPlayed)}</span>${g.fav ? '<span class="badge">★ fav</span>' : ''}</div>
     <button class="btn primary" id="dPlay" ${ok ? '' : 'disabled style="opacity:.5"'}>▶ Play${ok ? '' : ' (no emulator set)'}</button>
     <div class="row"><button class="btn" id="dFav">★ ${g.fav ? 'Unfavorite' : 'Favorite'}</button><button class="btn" id="dFolder">▣ Folder</button></div>
     <div class="sect"><h5>Saves</h5><div class="hint-empty">save manager is milestone 2.</div></div>
@@ -83,7 +85,7 @@ function renderCouch() {
   for (const k of Object.keys(S.systems)) { const it = S.games.filter(g => g.sys == k).sort((a, b) => a.title.localeCompare(b.title)); if (it.length) rows.push({ k, n: sysName(k), items: it }); }
   couchList = []; rowsMeta = [];
   if (!rows.length) { $('#inner').innerHTML = `<div class="hint-empty" style="padding:20px 48px">no games yet. press ⚙ to set up.</div>`; $('#hero').innerHTML = ''; return; }
-  $('#inner').innerHTML = rows.map((r, ri) => `<div class="crow" data-ri="${ri}"><h3><b>${esc(r.n)}</b> ${r.items.length}</h3><div class="strip">${r.items.map(g => { couchList.push(g.id); rowsMeta.push(ri); return `<div class="tile" data-id="${esc(g.id)}">${artEl(g)}</div>`; }).join('')}</div></div>`).join('');
+  $('#inner').innerHTML = rows.map((r, ri) => `<div class="crow" data-ri="${ri}" ${r.k == 'continue' ? '' : sysc(r.k)}><h3><b>${esc(r.n)}</b> ${r.items.length}</h3><div class="strip">${r.items.map(g => { couchList.push(g.id); rowsMeta.push(ri); return `<div class="tile" data-id="${esc(g.id)}" ${sysc(g.sys)}>${artEl(g)}</div>`; }).join('')}</div></div>`).join('');
   $('#rows').querySelectorAll('.tile[data-id]').forEach((t, i) => { t.onmouseenter = () => setFocus(i); t.onclick = () => { if (focus == i) openOv(); else setFocus(i); }; });
   setFocus(Math.min(focus, couchList.length - 1));
 }
@@ -100,7 +102,7 @@ function setFocus(i) {
   const maxX = Math.max(0, strip.scrollWidth - $('#rows').clientWidth);
   strip.style.transform = `translateX(-${Math.min(maxX, Math.max(0, t.offsetLeft - pad - t.offsetWidth * 0.07))}px)`;
   const g = byId(couchList[focus]);
-  const h = $('#hero'); h.classList.remove('swap'); void h.offsetWidth; h.classList.add('swap');
+  const h = $('#hero'); h.style.cssText = `--sysc:var(--sys-${g.sys})`; h.classList.remove('swap'); void h.offsetWidth; h.classList.add('swap');
   h.innerHTML = `<div class="sys">${esc(sysName(g.sys))} · ${esc(emuName(g.sys))}</div><h1>${esc(g.title)}</h1><div class="meta"><span>${fmtPt(g.playtime)} played</span><span>last: ${fmtLast(g.lastPlayed)}</span>${g.fav ? '<span>★</span>' : ''}</div><div class="hint"><span class="p">▶ Play</span><span>★</span></div>`;
   const a = $('#bgA'), b = $('#bgB'), nxt = bgFlip ? a : b, cur = bgFlip ? b : a; bgFlip = !bgFlip;
   nxt.style.backgroundImage = g.art ? `url("${fileUrl(g.art)}")` : 'none';
@@ -108,8 +110,9 @@ function setFocus(i) {
 }
 function openOv() {
   const g = byId(couchList[focus]); if (!g) return;
+  $('#ov').style.cssText = `--sysc:var(--sys-${g.sys})`;
   $('#ov').innerHTML = `<div class="box">${g.art ? `<img class="big" src="${fileUrl(g.art)}">` : `<div class="noart">no art yet</div>`}
-   <div class="body"><h2>${esc(g.title)}</h2><div class="meta"><span>${esc(sysName(g.sys))}</span><span>${fmtPt(g.playtime)} played</span><span>${esc(emuName(g.sys))}</span></div>
+   <div class="body"><h2>${esc(g.title)}</h2><div class="badges"><span class="badge sys">${esc(sysName(g.sys))}</span><span class="badge">${fmtPt(g.playtime)} played</span><span class="badge">${esc(emuName(g.sys))}</span></div>
    <div class="big-btns"><button class="btn primary f" style="width:auto" id="ovPlay">▶ Play</button><button class="btn" id="ovFav">★</button></div>
    <div class="desc">${esc(g.file)}</div></div></div>`;
   $('#ovPlay').onclick = () => launch(g.id); $('#ovFav').onclick = () => toggleFav(g.id);
@@ -153,9 +156,7 @@ function renderSetup(found, firstRun) {
 function setMode(m) { body.dataset.mode = m; $('#modeSeg').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.m == m)); repro.setPref({ mode: m }); if (m == 'couch') renderCouch(); }
 function setUI(u) { body.dataset.ui = u; $('#uiSeg').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.u == u)); repro.setPref({ ui: u }); if (body.dataset.mode == 'couch') requestAnimationFrame(() => setFocus(focus)); }
 function setTheme(t) { body.dataset.theme = t; $('#themeCss').href = `../../themes/${t}/theme.css`; document.querySelectorAll('.swatch').forEach(x => x.classList.toggle('on', x.dataset.t == t)); repro.setPref({ theme: t }); }
-$('#themeSwatches').innerHTML = THEMES.map(t => `<button class="swatch" data-t="${t}" title="${t}"></button>`).join('');
-const SW = { slate: '#1b1f2a', crt: '#39ff6a', paper: '#fffdf7' };
-document.querySelectorAll('.swatch').forEach(s => { s.style.background = SW[s.dataset.t]; s.onclick = () => setTheme(s.dataset.t); });
+async function loadThemes() { THEMES = await repro.themes(); $('#themeSwatches').innerHTML = THEMES.map(t => `<button class="swatch" data-t="${t.id}" title="${esc(t.name)}: ${esc(t.description || '')}" style="background:${t.swatch}"></button>`).join(''); document.querySelectorAll('.swatch').forEach(s => s.onclick = () => setTheme(s.dataset.t)); }
 $('#modeSeg').querySelectorAll('button').forEach(b => b.onclick = () => setMode(b.dataset.m));
 $('#uiSeg').querySelectorAll('button').forEach(b => b.onclick = () => setUI(b.dataset.u));
 $('#q').oninput = () => renderGrid();
@@ -223,10 +224,10 @@ setInterval(() => $('#clock').textContent = new Date().toLocaleTimeString([], { 
 function renderAll() { renderSide(); renderGrid(); renderDetail(); if (body.dataset.mode == 'couch') renderCouch(); }
 async function refresh() { S = await repro.snapshot(); renderAll(); }
 (async () => {
-  ROOT = await repro.root();
+  ROOT = await repro.root(); await loadThemes();
   S = await repro.snapshot();
   const c = S.config || {};
-  if (c.theme) setTheme(c.theme); if (c.ui) setUI(c.ui);
+  setTheme(THEMES.some(t => t.id == c.theme) ? c.theme : 'billet'); if (c.ui) setUI(c.ui);
   renderAll();
   if (c.mode == 'couch') setMode('couch');
   if (!S.games.length && !(c.romDirs || []).length) openSetup(true);
