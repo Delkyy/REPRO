@@ -109,16 +109,16 @@ body[data-mode="couch"] .top{position:absolute;width:100%;z-index:5;background:l
 [data-theme="paper"] .bgart{filter:blur(38px) brightness(1.1) saturate(.6) opacity(.5)}
 .fade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.55) 0%,rgba(0,0,0,0) 55%),linear-gradient(0deg,var(--bg) 0%,rgba(0,0,0,0) 50%);pointer-events:none}
 [data-theme="paper"] .fade{background:linear-gradient(0deg,var(--bg) 0%,transparent 50%)}
-.hero{position:absolute;left:calc(48px*var(--u));top:clamp(70px,14vh,calc(120px*var(--u)));width:min(58%,calc(760px*var(--u)));z-index:2;pointer-events:none}
-.hero .sys{font-family:var(--mono);font-size:calc(12px*var(--u));letter-spacing:.2em;color:var(--accent);text-transform:uppercase}
-.hero h1{font-size:clamp(26px,calc(3.4vw*var(--u)),calc(56px*var(--u)));font-weight:800;line-height:1.02;margin:calc(8px*var(--u)) 0;text-wrap:balance}
-.hero .meta{font-size:calc(13px*var(--u));margin:0;color:var(--muted)}
-.hero .desc{font-size:calc(14px*var(--u));color:var(--muted);line-height:1.5;margin-top:calc(10px*var(--u));max-width:52ch;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.hero .hint{display:flex;flex-wrap:wrap;gap:calc(10px*var(--u));margin-top:calc(18px*var(--u))}
-.hero .hint span{display:inline-flex;align-items:center;gap:8px;padding:calc(9px*var(--u)) calc(16px*var(--u));border-radius:999px;border:1px solid var(--line);background:rgba(0,0,0,.35);font-weight:700;font-size:calc(13px*var(--u));backdrop-filter:blur(6px)}
-[data-theme="paper"] .hero .hint span{background:rgba(255,255,255,.6)}
-.hero .hint span.p{background:var(--accent);border-color:transparent;color:#fff}
-.hero.swap{animation:heroin .3s ease-out}
+.chero{position:absolute;left:calc(48px*var(--u));top:clamp(70px,14vh,calc(120px*var(--u)));width:min(58%,calc(760px*var(--u)));z-index:2;pointer-events:none}
+.chero .sys{font-family:var(--mono);font-size:calc(12px*var(--u));letter-spacing:.2em;color:var(--accent);text-transform:uppercase}
+.chero h1{font-size:clamp(26px,calc(3.4vw*var(--u)),calc(56px*var(--u)));font-weight:800;line-height:1.02;margin:calc(8px*var(--u)) 0;text-wrap:balance}
+.chero .meta{font-size:calc(13px*var(--u));margin:0;color:var(--muted)}
+.chero .desc{font-size:calc(14px*var(--u));color:var(--muted);line-height:1.5;margin-top:calc(10px*var(--u));max-width:52ch;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.chero .hint{display:flex;flex-wrap:wrap;gap:calc(10px*var(--u));margin-top:calc(18px*var(--u))}
+.chero .hint span{display:inline-flex;align-items:center;gap:8px;padding:calc(9px*var(--u)) calc(16px*var(--u));border-radius:999px;border:1px solid var(--line);background:rgba(0,0,0,.35);font-weight:700;font-size:calc(13px*var(--u));backdrop-filter:blur(6px)}
+[data-theme="paper"] .chero .hint span{background:rgba(255,255,255,.6)}
+.chero .hint span.p{background:var(--accent);border-color:transparent;color:#fff}
+.chero.swap{animation:heroin .3s ease-out}
 @keyframes heroin{from{opacity:.4;transform:translateY(8px)}to{opacity:1;transform:none}}
 .rows{position:absolute;left:0;right:0;top:max(46vh,calc(300px*var(--u)));bottom:0;overflow:hidden;
   -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 calc(28px*var(--u)),#000 100%);mask-image:linear-gradient(180deg,transparent 0,#000 calc(28px*var(--u)),#000 100%)}
@@ -141,7 +141,7 @@ body[data-mode="couch"] .top{position:absolute;width:100%;z-index:5;background:l
 .hud .b{display:inline-grid;place-items:center;width:calc(20px*var(--u));height:calc(20px*var(--u));border-radius:50%;border:2px solid var(--muted);font-weight:800;font-size:calc(10px*var(--u));margin-right:6px;color:var(--fg)}
 body[data-mode="desktop"] .hud{display:none}
 .hud .now{margin-left:auto;font-family:var(--mono)}
-@media (max-width:700px){ .hero{width:80%} .crow h3,.crow .strip,.hero,.hud{padding-left:20px} .hero{left:0} .hero .desc{display:none} }
+@media (max-width:700px){ .chero{width:80%} .crow h3,.crow .strip,.chero,.hud{padding-left:20px} .chero{left:0} .chero .desc{display:none} }
 
 /* ---------- couch overlay ---------- */
 .ov{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(10px);display:none;z-index:20;align-items:center;justify-content:center;padding:20px}
