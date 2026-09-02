@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 100" role="img" aria-label="REPRO">
+  <title>REPRO mark</title>
+  <!-- one path, nonzero winding: stem + bowl + leg wound clockwise, the play-triangle counter wound the other way.
+       fill is currentColor so the app can tint it like the system logos (mask / color). -->
+  <path fill="currentColor" fill-rule="nonzero" d="
+    M0,0 H22 V100 H0 Z
+    M0,0 H48 A30,30 0 0 1 48,60 H0 Z
+    M42,52 H67 L90,100 H65 Z
+    M22,18 V42 L56,30 Z"/>
+</svg>

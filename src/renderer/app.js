@@ -145,8 +145,7 @@ function renderDetail() {
   const ok = hasEmu(g.sys); const emu = g.emulator ? S.emulators[g.emulator] : emuFor(g.sys);
   const tab = window._openTab || 'saves'; window._openTab = null;
   const panes = {
-    saves: `<div class="hint">save manager is milestone 2. this tab will show slots, restore, rename, and history once it's wired up.</div>
-      <div class="btnrow"><button id="dFolder2">open save folder</button></div>`,
+    saves: `<div id="savesPane"><div class="hint">loading…</div></div>`,
     launch: `<div class="kv">
         <span>emulator</span><select id="lEmu">${Object.entries(S.emulators).filter(([id, e]) => e.systems?.includes(g.sys)).map(([id, e]) => `<option value="${id}" ${g.emulator ? g.emulator == id : emuFor(g.sys) === e ? 'selected' : ''}>${esc(e.name)}${!g.emulator && emuFor(g.sys) === e ? ' (default)' : ''}</option>`).join('')}</select>${g.emulator ? '<span class="ovr">OVERRIDE</span>' : ''}
         <span>rom</span><code title="${esc(g.path)}">${esc(g.file)}</code>
@@ -160,7 +159,7 @@ function renderDetail() {
    <div class="head"><div class="cover">${g.art ? `<img src="${fileUrl(g.art)}">` : ''}</div><h3>${esc(g.title)}</h3></div>
    <div class="playbar"><button class="play" id="dPlay" ${ok ? '' : 'disabled'}>▶ Play${ok ? '' : ' (no emulator)'}</button>
      <div class="st"><span>last played</span><b>${fmtLast(g.lastPlayed)}</b></div><div class="st"><span>playtime</span><b>${fmtPt(g.playtime)}</b></div></div>
-   <div class="links"><button id="dFav">★ ${g.fav ? 'unfavorite' : 'favorite'}</button><button id="dFolder">▣ folder</button><button id="dTabLaunch2">⛭ launch</button></div>
+   <div class="links"><button id="dFav">★ ${g.fav ? 'unfavorite' : 'favorite'}</button><button id="dFolder">▣ folder</button><button id="dTabSaves">⛁ saves</button><button id="dTabLaunch2">⛭ launch</button></div>
    <div class="tabs">${['saves', 'launch', 'info'].map(t => `<button class="${tab == t ? 'on' : ''}" data-t="${t}">${t}${t == 'launch' && g.emulator ? '<span class="n" style="color:var(--accent2)">alt</span>' : ''}</button>`).join('')}</div>
    <div class="pane">${panes[tab]}</div>`;
   $('#dPlay').onclick = () => launch(g.id);
@@ -168,8 +167,10 @@ function renderDetail() {
   $('#dFolder').onclick = () => repro.showInFolder(g.path);
   const df2 = $('#dFolder2'); if (df2) df2.onclick = () => repro.showInFolder(g.path);
   $('#dCog').onclick = () => { window._openTab = 'launch'; renderDetail(); };
+  const dts = $('#dTabSaves'); if (dts) dts.onclick = () => { window._openTab = 'saves'; renderDetail(); };
   $('#dTabLaunch2').onclick = () => { window._openTab = 'launch'; renderDetail(); };
   $('#detail').querySelectorAll('[data-t]').forEach(b => b.onclick = () => { window._openTab = b.dataset.t; renderDetail(); });
+  if (tab === 'saves') loadSavesTab(g);
   const lSave = $('#lSave'); if (lSave) lSave.onclick = async () => {
     const chosen = $('#lEmu').value; const isDefault = emuFor(g.sys) === S.emulators[chosen];
     const patch = { emulator: isDefault ? null : chosen }; const r = await repro.setGame({ id: g.id, patch }); Object.assign(g, r); toast('saved launch settings'); renderAll();
@@ -177,6 +178,55 @@ function renderDetail() {
   const lReset = $('#lReset'); if (lReset) lReset.onclick = async () => { const r = await repro.setGame({ id: g.id, patch: { emulator: null } }); Object.assign(g, r); toast('reset to default emulator'); renderAll(); };
 }
 async function toggleFav(id) { const g = byId(id); const r = await repro.setGame({ id, patch: { fav: !g.fav } }); Object.assign(g, r); toast(g.fav ? 'added to favorites' : 'removed from favorites'); renderAll(); }
+
+async function loadSavesTab(g) {
+  const slots = await repro.listSlots(g.id);
+  const pane = $('#savesPane'); if (!pane) return;
+  const fmtSize = b => b > 1e6 ? (b/1e6).toFixed(1)+'MB' : b > 1e3 ? (b/1e3).toFixed(0)+'KB' : b+'B';
+  const fmtDate = ms => new Date(ms).toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+  pane.innerHTML = `
+    <div class="btnrow" style="margin-bottom:12px">
+      <button id="sSave" title="snapshot current save now">+ snapshot now</button>
+      <button id="sFolder" title="open save folder in explorer">▣ folder</button>
+    </div>
+    ${slots.length ? slots.map(sl => `
+    <div class="slot ${sl.isAuto?'auto':''}" data-file="${esc(sl.file)}">
+      <div class="sh" style="background:${sl.isActive ? 'var(--accent)' : sl.isAuto ? '#3a3a44' : 'linear-gradient(135deg,#3a4a7a,#1f2b4d)'}"></div>
+      <div class="t">
+        <b>${sl.isActive ? 'active (live)' : sl.isAuto ? sl.file.slice(5,-1-sl.file.split('.').pop().length) : sl.file.replace(/\.[^.]+$/,'')}</b>
+        <small>${fmtDate(sl.mtime)} · ${fmtSize(sl.size)}</small>
+      </div>
+      <div class="act">
+        ${sl.isActive ? '' : `<button data-restore="${esc(sl.file)}">restore</button>`}
+        ${sl.isActive ? '' : `<button data-rename="${esc(sl.file)}">rename</button>`}
+        ${sl.isActive || sl.isAuto ? '' : `<button data-del="${esc(sl.file)}" style="color:var(--accent)">✕</button>`}
+      </div>
+    </div>`).join('') : `<div class="hint">no saves yet — play the game and REPRO will snapshot automatically before each launch.</div>`}`;
+  $('#sSave').onclick = async () => { const r = await repro.snapshotSave(g.id); if (r.error) toast(`<b>error:</b> ${esc(r.error)}`); else { toast('snapshot taken'); loadSavesTab(g); } };
+  $('#sFolder').onclick = () => repro.openSaveFolder(g.id);
+  pane.querySelectorAll('[data-restore]').forEach(b => b.onclick = async () => {
+    const r = await repro.restoreSave({ id: g.id, file: b.dataset.restore });
+    if (r.error) toast(`<b>restore failed:</b> ${esc(r.error)}`); else { toast('restored. restart the game to play it.'); loadSavesTab(g); }
+  });
+  pane.querySelectorAll('[data-rename]').forEach(b => b.onclick = async () => {
+    const cur = b.dataset.rename.replace(/\.[^.]+$/,'');
+    const from = b.dataset.rename;
+    const gen = ++modalGen;
+    $('#modal').innerHTML = `<div class="box" style="max-width:460px"><div class="mh"><h3>Rename save</h3><button class="icon" id="mClose">✕</button></div><div class="mb"><div class="kv"><span>name</span><input id="rnInput" value="${esc(cur)}" style="max-width:280px"></div><div class="btnrow" style="margin-top:12px"><button id="rnSave" style="background:var(--accent);color:#fff;border-color:transparent">rename</button></div></div></div>`;
+    $('#mClose').onclick = () => { if (gen !== modalGen) return; modalGen++; $('#modal').classList.remove('open'); };
+    $('#rnSave').onclick = async () => {
+      if (gen !== modalGen) return;
+      const nw = $('#rnInput').value.trim(); if (!nw || nw === cur) { modalGen++; $('#modal').classList.remove('open'); return; }
+      const r = await repro.renameSlot({ id: g.id, from, to: nw });
+      if (r.error) toast(`<b>error:</b> ${esc(r.error)}`); else { modalGen++; $('#modal').classList.remove('open'); loadSavesTab(g); }
+    };
+    $('#modal').classList.add('open');
+  });
+  pane.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+    const r = await repro.deleteSlot({ id: g.id, file: b.dataset.del });
+    if (r.error) toast(`<b>error:</b> ${esc(r.error)}`); else { toast('deleted'); loadSavesTab(g); }
+  });
+}
 async function launch(id) { const g = byId(id); const r = await repro.launch(id); if (r.error) return toast(`<b>can't launch:</b> ${esc(r.error)}`); toast(`launching <b>${esc(g.title)}</b>`); }
 repro.onGameExited(async ({ gameId, secs }) => { await refresh(); const g = byId(gameId); toast(`back. <b>${esc(g?.title)}</b>, ${fmtPt(secs)} this session.`); });
 
@@ -186,7 +236,7 @@ function renderCouch() {
   for (const k of Object.keys(S.systems)) { const it = S.games.filter(g => g.sys == k).sort((a, b) => a.title.localeCompare(b.title)); if (it.length) rows.push({ k, n: sysName(k), items: it }); }
   cList = []; cRows = [];
   if (!rows.length) { $('#cinner').innerHTML = `<div class="hint" style="padding:20px 48px">no games yet. switch to desktop and hit +.</div>`; $('#chero').innerHTML = ''; return; }
-  $('#cinner').innerHTML = rows.map((r, ri) => `<div class="crow" data-ri="${ri}" ${r.k == 'continue' ? '' : sysc(r.k)} data-skin="${S.sysdb?.[r.k]?.skin || ''}"><h3>${r.k == 'continue' ? '' : logo(r.k)}<b>${esc(r.n)}</b> ${r.items.length}</h3><div class="strip">${r.items.map(g => { cList.push(g.id); cRows.push(ri); return `<div class="ctile" data-id="${esc(g.id)}">${artEl(g)}</div>`; }).join('')}</div></div>`).join('');
+  $('#cinner').innerHTML = rows.map((r, ri) => `<div class="crow" data-ri="${ri}" ${r.k == 'continue' ? '' : sysc(r.k)} data-skin="${S.sysdb?.[r.k]?.skin || ''}"><h3>${r.k == 'continue' ? '' : logo(r.k)}<b>${esc(r.n)}</b> ${r.items.length}</h3><div class="strip">${r.items.map(g => { cList.push(g.id); cRows.push(ri); return `<div class="ctile" data-id="${esc(g.id)}" ${r.k == 'continue' ? sysc(g.sys) : ''}>${artEl(g)}</div>`; }).join('')}</div></div>`).join('');
   $('#crows').querySelectorAll('.ctile[data-id]').forEach((t, i) => { t.onmouseenter = () => cSetFocus(i); t.onclick = () => { if (cFocus == i) cOpen(); else cSetFocus(i); }; });
   cSetFocus(Math.min(cFocus, cList.length - 1));
 }
@@ -379,6 +429,7 @@ function renderAll() { renderSide(); renderMain(); renderDetail(); if (app.class
 async function refresh(showToast) { S = await repro.scan(); if (showToast) toast(`rescanned: ${S.games.length} games`); renderAll(); }
 (async () => {
   ROOT = await repro.root();
+  $('#brandLg').style.setProperty('--m', `url('${fileUrl(ROOT + '/assets/brand/repro-mark.svg')}')`);
   S = await repro.snapshot();
   const c = S.config || {};
   setTheme(c.theme || 'billet'); setUI(c.ui || 'desk');

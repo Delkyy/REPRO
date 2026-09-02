@@ -182,6 +182,106 @@ function findDuplicates() {
   return Object.values(groups).filter(l => l.length > 1);
 }
 
+
+// ============================
+// SAVES (M2) — shared save folder, per-game organisation
+// saves/<sys>/<safeTitle>/active.<ext>  — live card, emulator always points here
+// saves/<sys>/<safeTitle>/auto-<date>.<ext> — snapshot before each launch (kept: last 10)
+// saves/<sys>/<safeTitle>/slot-<name>.<ext> — user-named slots
+// xemu is special: its hdd is a 4GB qcow2; we snapshot it only if newer on exit
+// ============================
+const SAVE_EXT = { gc:'raw', wii:'raw', ps1:'mcd', ps2:'ps2', ps3:'ps3', xbox:'qcow2', x360:'sav', psp:'mcd', psp2:'vmc', generic:'sav' };
+const SAVE_DIR = path.join(ROOT, 'saves');
+function safeName(s){ return s.replace(/[<>:"/\|?* -]/g,'_').replace(/\.+$/,'').slice(0,60); }
+function getSaveDir(g){ return path.join(SAVE_DIR, g.sys, safeName(g.title)); }
+function getSaveExt(g){ return SAVE_EXT[g.sys] || SAVE_EXT.generic; }
+function activeSave(g){ return path.join(getSaveDir(g), 'active.' + getSaveExt(g)); }
+
+// xemu HDD path from config
+function xemuHddPath(){ const e = config.emulators.xemu; if (!e?.dataDir) return null; const tf = path.join(e.dataDir,'xemu.toml'); if (!fs.existsSync(tf)) return null; try { const t=fs.readFileSync(tf,'utf8'); const m=t.match(/hdd_path\s*=\s*"([^"]+)"/); return m?m[1]:null; } catch{ return null; } }
+
+// snapshot: copy active save to a dated slot (trim older than 10)
+function snapshotSave(g) {
+  const dir = getSaveDir(g);
+  if (g.sys === 'xbox') { return snapshotXemu(g); }  // handled separately
+  const src = activeSave(g);
+  if (!fs.existsSync(src)) return null;
+  fs.mkdirSync(dir, { recursive: true });
+  const stamp = new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
+  const dst = path.join(dir, 'auto-' + stamp + '.' + getSaveExt(g));
+  fs.copyFileSync(src, dst);
+  // trim to 10 auto snapshots
+  const autos = fs.readdirSync(dir).filter(f=>f.startsWith('auto-')).sort();
+  for (const f of autos.slice(0, Math.max(0, autos.length - 10))) fs.unlinkSync(path.join(dir, f));
+  return dst;
+}
+function snapshotXemu(g) {
+  const hdd = xemuHddPath(); if (!hdd || !fs.existsSync(hdd)) return null;
+  const dir = getSaveDir(g); fs.mkdirSync(dir, { recursive: true });
+  const stamp = new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
+  const dst = path.join(dir, 'auto-' + stamp + '.qcow2');
+  try { fs.copyFileSync(hdd, dst); } catch(e){ return null; }
+  const autos = fs.readdirSync(dir).filter(f=>f.startsWith('auto-')).sort();
+  for (const f of autos.slice(0, Math.max(0, autos.length - 5))) fs.unlinkSync(path.join(dir, f)); // 5 for xemu, they're huge
+  return dst;
+}
+
+// restore: copy a named slot back to active
+function restoreSave(g, slotFile) {
+  const dir = getSaveDir(g);
+  const src = path.join(dir, slotFile);
+  if (!fs.existsSync(src)) return { error: 'slot file not found' };
+  if (g.sys === 'xbox') { const hdd = xemuHddPath(); if (!hdd) return { error: 'xemu hdd path not found' }; fs.copyFileSync(src, hdd); return { ok: true }; }
+  // backup active before restoring
+  const act = activeSave(g);
+  if (fs.existsSync(act)) { fs.copyFileSync(act, act + '.bak'); }
+  fs.copyFileSync(src, act);
+  return { ok: true };
+}
+
+// list slots for a game
+function listSlots(g) {
+  const dir = getSaveDir(g);
+  if (!fs.existsSync(dir)) return [];
+  const files = fs.readdirSync(dir).filter(f => !f.endsWith('.bak'));
+  return files.map(f => {
+    const st = fs.statSync(path.join(dir, f));
+    return { file: f, size: st.size, mtime: st.mtimeMs, isActive: f.startsWith('active.'), isAuto: f.startsWith('auto-') };
+  }).sort((a,b) => b.mtime - a.mtime);
+}
+
+// rename a slot
+function renameSlot(g, from, to) {
+  const dir = getSaveDir(g);
+  const ext = path.extname(from);
+  const newName = to.replace(/[<>:"/\|?* -]/g,'_') + ext;
+  if (from === newName) return { ok: true };
+  fs.renameSync(path.join(dir, from), path.join(dir, newName));
+  return { ok: true, newFile: newName };
+}
+
+// delete a slot
+function deleteSlot(g, file) {
+  if (file.startsWith('active.')) return { error: "can't delete the active save" };
+  const p = path.join(getSaveDir(g), file);
+  if (!fs.existsSync(p)) return { error: 'not found' };
+  fs.unlinkSync(p);
+  return { ok: true };
+}
+
+// prepare: point the emulator at our managed save dir.
+// For ps1/ps2: overwrite the emulator's memcard path with active.mcd / active.ps2
+// For gc: overwrite the Dolphin GC card path with active.raw
+// For xemu: we DON'T move the HDD — it's already in place; we just snapshot before launch
+// For other systems: no managed card yet, fallback to emulator's own default
+function prepareSave(g) {
+  const dir = getSaveDir(g); fs.mkdirSync(dir, { recursive: true });
+  const act = activeSave(g);
+  // if no active save yet, create a blank one so the emulator doesn't start confused
+  if (!fs.existsSync(act) && g.sys !== 'xbox') { fs.writeFileSync(act, Buffer.alloc(128*1024)); } // 128KB blank
+  return { saveDir: dir, activePath: act };
+}
+
 // ---------- launch
 let running = null;
 function emulatorFor(sys) {
@@ -193,8 +293,12 @@ function launch(gameId) {
   if (running) return { error: 'something is already running' };
   const emu = g.emulator ? { id: g.emulator, ...config.emulators[g.emulator], recipe: recipes[g.emulator] } : emulatorFor(g.sys);
   if (!emu || !emu.exe) return { error: `no emulator set up for ${SYSTEMS[g.sys]}` };
+  // prepare managed save dir and snapshot active save before launch
+  let saveInfo = null;
+  try { saveInfo = prepareSave(g); snapshotSave(g); } catch(e) { console.warn('save prep failed:', e.message); }
   const argsTpl = g.args || emu.recipe.args[g.sys] || ['{rom}'];
-  const args = argsTpl.map(a => a.replace('{rom}', g.path).replace('{dir}', path.dirname(emu.exe)));
+  const savePath = saveInfo?.activePath || '';
+  const args = argsTpl.map(a => a.replace('{rom}', g.path).replace('{dir}', path.dirname(emu.exe)).replace('{save}', savePath));
   const started = Date.now();
   let child;
   try { child = spawn(emu.exe, args, { cwd: path.dirname(emu.exe), detached: false, stdio: 'ignore' }); }
@@ -204,10 +308,12 @@ function launch(gameId) {
   child.on('exit', () => {
     const secs = Math.round((Date.now() - started) / 1000);
     g.playtime = (g.playtime || 0) + secs; g.lastPlayed = Date.now(); saveLibrary();
+    // for xemu, copy back the HDD as a post-play snapshot (mtime check would be nice but is unreliable on qcow2)
+    if (g.sys === 'xbox' && secs > 10) try { snapshotXemu(g); } catch {}
     running = null;
     if (win && !win.isDestroyed()) { win.restore(); win.focus(); win.webContents.send('game-exited', { gameId, secs }); }
   });
-  return { ok: true, exe: emu.exe, args };
+  return { ok: true, exe: emu.exe, args, saveDir: saveInfo?.saveDir };
 }
 function killRunning() {
   if (!running) return { error: 'nothing is running' };
@@ -266,7 +372,7 @@ function buildMenu() {
 function createWindow() {
   win = new BrowserWindow({
     width: 1400, height: 860, minWidth: 700, minHeight: 500,
-    backgroundColor: '#0C0C0D', title: 'REPRO',
+    backgroundColor: '#0C0C0D', title: 'REPRO', icon: path.join(ROOT, 'assets', 'brand', 'icon.ico'),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true },
   });
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
@@ -319,3 +425,10 @@ ipcMain.handle('createSystemFolder', (_, sys) => { const p = path.join(ROOT, 'ro
 ipcMain.handle('killRunning', () => killRunning());
 ipcMain.handle('isRunning', () => !!running);
 ipcMain.handle('setHubKey', (_, key) => { const prev = config.hubKey; config.hubKey = key; const ok = registerHubKey(); if (!ok) config.hubKey = prev; saveConfig(); return { ok, key: config.hubKey }; });
+// M2: saves
+ipcMain.handle('listSlots', (_, id) => { const g = library.games[id]; if (!g) return []; return listSlots(g); });
+ipcMain.handle('snapshotSave', (_, id) => { const g = library.games[id]; if (!g) return { error: 'no such game' }; try { const f = snapshotSave(g); return { ok: true, file: f }; } catch(e) { return { error: e.message }; } });
+ipcMain.handle('restoreSave', (_, { id, file }) => { const g = library.games[id]; if (!g) return { error: 'no such game' }; return restoreSave(g, file); });
+ipcMain.handle('renameSlot', (_, { id, from, to }) => { const g = library.games[id]; if (!g) return { error: 'no such game' }; return renameSlot(g, from, to); });
+ipcMain.handle('deleteSlot', (_, { id, file }) => { const g = library.games[id]; if (!g) return { error: 'no such game' }; return deleteSlot(g, file); });
+ipcMain.handle('openSaveFolder', (_, id) => { const g = library.games[id]; if (!g) return; const d = getSaveDir(g); fs.mkdirSync(d, { recursive: true }); shell.openPath(d); });

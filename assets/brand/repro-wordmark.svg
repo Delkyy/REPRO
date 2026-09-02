@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -2 468 104" role="img" aria-label="REPRO">
+  <title>REPRO wordmark</title>
+  <!-- hand-built on the mark's grid: cap 100, stems 22, bars 18, round strokes 20/23 (rounds read thinner, so they get more).
+       both R's carry the play counter; P keeps a round one so the triangle reads as the R's thing, not a font quirk.
+       O overshoots the cap line by 2 top and bottom. kerning: 10 after each R (the leg is diagonal), 14 elsewhere. -->
+  <g fill="currentColor" fill-rule="nonzero">
+    <!-- R -->
+    <path d="M0,0 H22 V100 H0 Z M0,0 H48 A30,30 0 0 1 48,60 H0 Z M42,52 H67 L90,100 H65 Z M22,18 V42 L56,30 Z"/>
+    <!-- E -->
+    <path transform="translate(100,0)" d="M0,0 H22 V100 H0 Z M0,0 H70 V18 H0 Z M0,40 H62 V58 H0 Z M0,82 H70 V100 H0 Z"/>
+    <!-- P -->
+    <path transform="translate(184,0)" d="M0,0 H22 V100 H0 Z M0,0 H48 A30,30 0 0 1 48,60 H0 Z M22,18 V42 H46 A12,12 0 0 0 46,18 Z"/>
+    <!-- R -->
+    <path transform="translate(276,0)" d="M0,0 H22 V100 H0 Z M0,0 H48 A30,30 0 0 1 48,60 H0 Z M42,52 H67 L90,100 H65 Z M22,18 V42 L56,30 Z"/>
+    <!-- O -->
+    <path transform="translate(376,0)" d="M46,-2 A46,46 0 0 1 92,44 V56 A46,46 0 0 1 46,102 A46,46 0 0 1 0,56 V44 A46,46 0 0 1 46,-2 Z M46,18 A23,23 0 0 0 23,41 V59 A23,23 0 0 0 46,82 A23,23 0 0 0 69,59 V41 A23,23 0 0 0 46,18 Z"/>
+  </g>
+</svg>

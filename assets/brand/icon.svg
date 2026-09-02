@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="REPRO">
+  <title>REPRO app icon</title>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1A1B1F"/>
+      <stop offset="1" stop-color="#0B0B0D"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.48" r="0.5">
+      <stop offset="0" stop-color="#FF2D6F" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#FF2D6F" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="clip"><rect width="1024" height="1024" rx="176"/></clipPath>
+  </defs>
+  <!-- the tile: same dark surface as the app, same corner language as a cover card, hairline light edge like glass -->
+  <rect width="1024" height="1024" rx="176" fill="url(#tile)"/>
+  <rect width="1024" height="1024" rx="176" fill="url(#glow)" clip-path="url(#clip)"/>
+  <rect x="2" y="2" width="1020" height="1020" rx="174" fill="none" stroke="#fff" stroke-opacity=".07" stroke-width="4"/>
+  <!-- the mark (assets/brand/repro-mark.svg) at x5.6, nudged right 6 so the stem-heavy R sits optically centered -->
+  <g transform="translate(266,232) scale(5.6)">
+    <path fill="#FF2D6F" fill-rule="nonzero" d="M0,0 H22 V100 H0 Z M0,0 H48 A30,30 0 0 1 48,60 H0 Z M42,52 H67 L90,100 H65 Z M22,18 V42 L56,30 Z"/>
+  </g>
+</svg>

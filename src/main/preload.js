@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('repro', {
   themes: call('themes'), openPath: call('openPath'), launchEmu: call('launchEmu'),
   duplicates: call('duplicates'), saveView: call('saveView'), removeView: call('removeView'), createSystemFolder: call('createSystemFolder'),
   killRunning: call('killRunning'), isRunning: call('isRunning'), setHubKey: call('setHubKey'),
+  listSlots: call('listSlots'), snapshotSave: call('snapshotSave'), restoreSave: call('restoreSave'),
+  renameSlot: call('renameSlot'), deleteSlot: call('deleteSlot'), openSaveFolder: call('openSaveFolder'),
   onMenu: (fn) => ipcRenderer.on('menu', (_, cmd, arg) => fn(cmd, arg)),
   pathOf: (file) => webUtils.getPathForFile(file),
   onGameExited: (fn) => ipcRenderer.on('game-exited', (_, d) => fn(d)),

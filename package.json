@@ -6,7 +6,43 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "electron .",
-    "dist": "electron-builder --win portable"
+    "brand": "electron test/brandshot.js && python scripts/make-ico.py",
+    "shot": "electron test/couchshot.js",
+    "icon": "node scripts/make-icon.js",
+    "dist": "npm run icon && electron-builder --win portable"
+  },
+  "build": {
+    "appId": "io.repro.hub",
+    "productName": "REPRO",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "themes/**/*",
+      "recipes/**/*",
+      "systems.json",
+      "package.json",
+      "!node_modules/**",
+      "!saves/**",
+      "!library.json",
+      "!config.json",
+      "!art/**",
+      "!dist/**",
+      "!sketches/**",
+      "!test/**",
+      "!docs/**"
+    ],
+    "win": {
+      "icon": "assets/brand/icon.ico",
+      "target": [
+        { "target": "portable", "arch": ["x64"] }
+      ]
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.exe"
+    }
   },
   "keywords": [],
   "author": "",
