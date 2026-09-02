@@ -21,7 +21,7 @@ const html = `<!doctype html><meta charset=utf-8>
   .muted{color:#9A9DA3}
 </style>
 <div class="r h"><span>id</span><span>side 36×18</span><span>banner 70×22</span><span>hero 50×16</span><span>big, fg</span><span>note</span></div>
-${ids.map(id => { const c = SYS[id]?.color || '#9A9DA3', m = `--m:url('${url(id)}')`; const src = fs.readFileSync(path.join(dir, id + '.svg'), 'utf8'); const kind = /<text/.test(src) ? 'TEXT BADGE' : /simple-icons|role="img"/.test(src) ? 'simple-icons' : 'drawn'; return `<div class=r><span style="color:${c}">${id}</span><i class="lg side" style="${m};color:${c}"></i><i class="lg ban" style="${m};color:${c}"></i><i class="lg hero" style="${m};color:${c}"></i><i class="lg big" style="${m}"></i><span class=muted>${SYS[id]?.name || 'emulator'} · ${kind}</span></div>`; }).join('')}`;
+${ids.map(id => { const c = SYS[id]?.color || '#9A9DA3', m = `--m:url('${url(id)}')`; const src = fs.readFileSync(path.join(dir, id + '.svg'), 'utf8'); const kind = /<text/.test(src) ? 'TEXT BADGE' : /wikimedia commons/.test(src) ? 'commons' : /simple-icons|role="img"/.test(src) ? 'simple-icons' : 'drawn'; return `<div class=r><span style="color:${c}">${id}</span><i class="lg side" style="${m};color:${c}"></i><i class="lg ban" style="${m};color:${c}"></i><i class="lg hero" style="${m};color:${c}"></i><i class="lg big" style="${m}"></i><span class=muted>${SYS[id]?.name || 'emulator'} · ${kind}</span></div>`; }).join('')}`;
 app.whenReady().then(async () => {
   const H = 70 + Math.ceil(ids.length / 2) * 37, W = 1400;
   const tmp = path.join(app.getPath('temp'), 'repro-logosheet.html'); fs.writeFileSync(tmp, html.replace('${H}', H));

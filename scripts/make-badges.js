@@ -50,9 +50,10 @@ function word(text) {
 // arcade: a stick + two buttons silhouette, no brand. same 100 cap.
 const ARCADE = { w: 104, body: '<path d="M8,64H96A8,8 0 0 1 104,72V100H0V72A8,8 0 0 1 8,64Z"/><circle cx="24" cy="14" r="14"/><path d="M20,22H28V66H20Z"/><circle cx="62" cy="54" r="12"/><circle cx="90" cy="44" r="12"/><path d="M56,54H68V68H56Z M84,44H96V68H84Z"/>' };
 
+// only ids that DON'T have a real mark. n64/snes/nes/ds/x360/dc/saturn/gba are real commons marks now (see README) —
+// do not add them back here or a rerun stomps them.
 const BADGES = {
-  n64: word('N64'), snes: word('SNES'), x360: word('360'), dc: word('DC'), nes: word('NES'),
-  gb: word('GB'), gba: word('GBA'), ds: word('DS'), genesis: word('GEN'), saturn: word('SAT'),
+  gb: word('GB'), genesis: word('GEN'),
   arcade: ARCADE,
   pcsx2: word('PCSX2'), duckstation: word('DUCK'), xemu: word('XEMU'), xenia: word('XENIA'),
 };

@@ -375,7 +375,17 @@ document.addEventListener('keydown', e => {
   if (e.ctrlKey && e.key == '2') { setMode('couch'); return; }
   if (!app.classList.contains('couch')) return;
   if (e.key == 'Tab') { e.preventDefault(); setMode('desktop'); return; }
+  if (guideOpen) {
+    if (e.key == 'Escape' || e.key == 'Backspace') closeGuide();
+    else if (e.key == 'ArrowDown') guideMoveDown();
+    else if (e.key == 'ArrowUp') guideMoveUp();
+    else if (e.key == 'ArrowLeft') guideSectionNav(-1);
+    else if (e.key == 'ArrowRight') guideSectionNav(1);
+    else if (e.key == 'Enter') guideSelect(byId(cList[cFocus]));
+    return;
+  }
   if ($('#cov').classList.contains('open')) { if (e.key == 'Escape' || e.key == 'Backspace') $('#cov').classList.remove('open'); if (e.key == 'Enter') launch(cList[cFocus]); return; }
+  if (e.key.toLowerCase() == 'g' && !guideOpen) { openGuide(); return; }
   cKey(e.key);
 });
 // drag-drop a folder onto the window adds it as a rom dir
@@ -404,8 +414,20 @@ function pollPad() {
   if (gp && app.classList.contains('couch') && !$('#modal').classList.contains('open')) {
     const b = i => gp.buttons[i]?.pressed, ax = gp.axes;
     const sx = readStickAxis(ax[0], 'x'), sy = readStickAxis(ax[1], 'y');
-    const now = { up: b(12) || sy < 0, down: b(13) || sy > 0, left: b(14) || sx < 0, right: b(15) || sx > 0, a: b(0), bb: b(1), x: b(2), y: b(3), sel: b(8) };
+    const now = { up: b(12) || sy < 0, down: b(13) || sy > 0, left: b(14) || sx < 0, right: b(15) || sx > 0, a: b(0), bb: b(1), x: b(2), y: b(3), sel: b(8), start: b(9) };
     const edge = k => now[k] && !padPrev[k];
+    if (guideOpen) {
+      // guide nav: up/down moves in right panel, left/right changes section, A selects, B/start closes
+      if (edge('bb') || edge('start')) closeGuide();
+      else if (edge('a')) guideSelect(byId(cList[cFocus]));
+      else if (now.up && (edge('up') || (padHeld > 18 && padHeld % 6 == 0))) guideMoveUp();
+      else if (now.down && (edge('down') || (padHeld > 18 && padHeld % 6 == 0))) guideMoveDown();
+      else if (edge('left')) guideSectionNav(-1);
+      else if (edge('right')) guideSectionNav(1);
+      padHeld = (now.up || now.down) ? padHeld + 1 : 0;
+      padPrev = now;
+      requestAnimationFrame(pollPad); return;
+    }
     const ovOpen = $('#cov').classList.contains('open');
     if (ovOpen) { if (edge('a')) launch(cList[cFocus]); if (edge('bb')) $('#cov').classList.remove('open'); }
     else {
@@ -413,6 +435,7 @@ function pollPad() {
       const rep = (k, key) => { if (now[k] && (edge(k) || (padHeld > 28 && padHeld % 9 == 0))) cKey(key); };
       rep('up', 'ArrowUp'); rep('down', 'ArrowDown'); rep('left', 'ArrowLeft'); rep('right', 'ArrowRight');
       if (edge('a')) cOpen(); if (edge('x')) cKey('x'); if (edge('y')) cKey('y'); if (edge('sel')) setMode('desktop');
+      if (edge('start')) openGuide();
     }
     padHeld = (now.up || now.down || now.left || now.right) ? padHeld + 1 : 0;
     padPrev = now;
@@ -424,6 +447,139 @@ function pollPad() {
 function padAnyEdge(gp) { const any = gp.buttons.some(b => b.pressed); const r = any && !padPrev.any; padPrev.any = any; return r; }
 window.addEventListener('gamepadconnected', e => toast(`controller connected: <b>${esc(e.gamepad.id)}</b>`));
 pollPad();
+
+/* ============ GUIDE OVERLAY ============ */
+let guideSection = 'game'; // game | saves | settings | power
+let guideFocus = 0;    // focused button index within right panel
+let guideOpen = false;
+let guideSlotsCache = [];
+const guideSections = [
+  { id:'game',     ico:'▶',  label:'Game'     },
+  { id:'saves',    ico:'⛁',  label:'Saves'    },
+  { id:'settings', ico:'⚙',  label:'Settings' },
+  { id:'power',    ico:'⏻',  label:'Power'    },
+];
+function openGuide() {
+  guideOpen = true;
+  const g = byId(cList[cFocus]);
+  renderGuide(g);
+  $('#guide').classList.add('open');
+}
+function closeGuide() {
+  guideOpen = false;
+  $('#guide').classList.remove('open');
+}
+async function renderGuide(g) {
+  const el = $('#guide'); if (!el) return;
+  const now = new Date();
+  const time = now.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+  const date = now.toLocaleDateString([], { weekday:'long', month:'long', day:'numeric' });
+  const leftItems = guideSections.map((sec,i) => `
+    <div class="gitem ${guideSection===sec.id?'on':''}" data-sec="${sec.id}">
+      <span class="ico">${sec.ico}</span>${sec.label}
+    </div>`).join('');
+  el.innerHTML = `
+    <div class="scrim" id="guideScrim"></div>
+    <div class="box">
+      <div class="left">
+        <div class="gtime">${time}</div>
+        <div class="gdate">${date}</div>
+        <div class="gsep"></div>
+        ${leftItems}
+        <div class="gsep" style="margin-top:auto"></div>
+        <div class="gitem acc" data-sec="power"><span class="ico">⏻</span>Quit REPRO</div>
+      </div>
+      <div class="right" id="guideRight"></div>
+    </div>`;
+  el.querySelectorAll('[data-sec]').forEach(b => b.onclick = () => { guideSection = b.dataset.sec; guideFocus = 0; renderGuide(g); });
+  $('#guideScrim').onclick = closeGuide;
+  await renderGuideRight(g);
+}
+async function renderGuideRight(g) {
+  const el = $('#guideRight'); if (!el) return;
+  const fmtPt = s => !s ? '—' : s < 3600 ? `${Math.round(s/60)}m` : `${Math.floor(s/3600)}h ${Math.round((s%3600)/60)}m`;
+  const fmtDate = ms => !ms ? 'never' : new Date(ms).toLocaleDateString([], {month:'short',day:'numeric'});
+  const fmtSize = b => b > 1e6 ? (b/1e6).toFixed(1)+'MB' : b > 1e3 ? Math.round(b/1e3)+'KB' : b+'B';
+  const fmtTs = ms => new Date(ms).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+
+  if (guideSection === 'game') {
+    el.innerHTML = `
+      <h4>${esc(sysName(g?.sys||''))} · ${esc(emuName(g?.sys||''))}</h4>
+      <div class="game-card">
+        <div class="cover">${g?.art ? `<img src="${fileUrl(g.art)}">` : ''}</div>
+        <div><h3>${esc(g?.title||'no game')}</h3><div class="meta">${fmtPt(g?.playtime)} played · last ${fmtDate(g?.lastPlayed)}</div></div>
+      </div>
+      <button class="gbtn primary focus" data-action="play"><span class="k">A</span>Resume / Play</button>
+      <button class="gbtn" data-action="saves"><span class="k">Y</span>Save slots</button>
+      <button class="gbtn" data-action="fav"><span class="k">X</span>${g?.fav ? 'Remove favorite' : 'Add to favorites'}</button>
+      <button class="gbtn" data-action="desktop"><span class="k">▤</span>Go to desktop</button>
+      <div class="hints"><span><span class="b">B</span>close</span><span><span class="b">↑↓</span>navigate</span><span><span class="b">A</span>select</span></div>`;
+  } else if (guideSection === 'saves') {
+    const slots = g ? await repro.listSlots(g.id) : [];
+    guideSlotsCache = slots;
+    const fmtSlot = sl => sl.isActive ? 'active' : sl.isAuto ? sl.file.slice(5, sl.file.lastIndexOf('.')) : sl.file.replace(/\.[^.]+$/,'');
+    el.innerHTML = `
+      <h4>Save slots — ${esc(g?.title||'')}</h4>
+      ${slots.length ? `<div class="slots-mini">${slots.slice(0,8).map((sl,i) => `<div class="sm ${sl.isActive?'act':''}" data-slot="${i}">${esc(fmtSlot(sl))}<br><span style="opacity:.6">${fmtTs(sl.mtime)} · ${fmtSize(sl.size)}</span></div>`).join('')}</div>` : '<div class="meta" style="margin:10px 0">no saves yet — play the game first.</div>'}
+      <div style="margin-top:14px"></div>
+      <button class="gbtn primary focus" data-action="snapshot"><span class="k">A</span>Snapshot now</button>
+      <button class="gbtn" data-action="opensaves"><span class="k">X</span>Open save folder</button>
+      <div class="hints"><span><span class="b">B</span>close</span><span><span class="b">A</span>snapshot</span></div>`;
+    el.querySelectorAll('[data-slot]').forEach(b => b.onclick = async () => {
+      const sl = slots[+b.dataset.slot]; if (!sl || sl.isActive) return;
+      await repro.restoreSave({ id: g.id, file: sl.file }); toast('restored — restart to play it'); closeGuide();
+    });
+  } else if (guideSection === 'settings') {
+    const hub = S.config.hubKey || 'Ctrl+Alt+H';
+    el.innerHTML = `
+      <h4>Quick settings</h4>
+      <button class="gbtn focus" data-action="theme-billet"><span class="k">1</span>Theme: Billet</button>
+      <button class="gbtn" data-action="theme-manual"><span class="k">2</span>Theme: Manual</button>
+      <button class="gbtn" data-action="theme-crt"><span class="k">3</span>Theme: CRT</button>
+      <div class="gsep" style="margin:10px 0"></div>
+      <button class="gbtn" data-action="tv"><span class="k">T</span>Scale: ${document.documentElement.style.getPropertyValue('--u')==='1.5'?'TV (active)':'TV'}</button>
+      <button class="gbtn" data-action="desk-scale"><span class="k">D</span>Scale: ${document.documentElement.style.getPropertyValue('--u')!=='1.5'?'Desk (active)':'Desk'}</button>
+      <div class="gsep" style="margin:10px 0"></div>
+      <div class="meta" style="font-size:11px;color:var(--muted)">Hub key: ${esc(hub)} closes running game from anywhere</div>
+      <div class="hints"><span><span class="b">B</span>close</span><span><span class="b">A</span>select</span></div>`;
+  } else if (guideSection === 'power') {
+    el.innerHTML = `
+      <h4>Power</h4>
+      <button class="gbtn primary focus" data-action="desktop"><span class="k">A</span>Go to desktop mode</button>
+      <button class="gbtn" data-action="quit"><span class="k">Y</span>Quit REPRO</button>
+      <div class="hints"><span><span class="b">B</span>close</span><span><span class="b">A</span>select</span></div>`;
+  }
+
+  // wire button actions
+  const btns = [...el.querySelectorAll('[data-action]')];
+  if (guideFocus >= btns.length) guideFocus = 0;
+  btns.forEach((b,i) => {
+    b.classList.toggle('focus', i === guideFocus);
+    b.onclick = () => guideAction(b.dataset.action, g);
+  });
+}
+function guideAction(action, g) {
+  if (action === 'play') { closeGuide(); if (g) launch(g.id); }
+  else if (action === 'saves') { guideSection='saves'; guideFocus=0; renderGuide(g); }
+  else if (action === 'fav') { if (g) toggleFav(g.id); closeGuide(); }
+  else if (action === 'desktop') { closeGuide(); setMode('desktop'); }
+  else if (action === 'quit') { closeGuide(); repro.quit?.() || window.close(); }
+  else if (action === 'snapshot') { if (g) { repro.snapshotSave(g.id).then(()=>{ toast('snapshot taken'); renderGuideRight(g); }); } }
+  else if (action === 'opensaves') { if (g) repro.openSaveFolder(g.id); closeGuide(); }
+  else if (action === 'theme-billet') { setTheme('billet'); closeGuide(); }
+  else if (action === 'theme-manual') { setTheme('manual'); closeGuide(); }
+  else if (action === 'theme-crt') { setTheme('crt'); closeGuide(); }
+  else if (action === 'tv') { setUI('tv'); closeGuide(); }
+  else if (action === 'desk-scale') { setUI('desk'); closeGuide(); }
+}
+function guideMoveDown() { const btns = [...$('#guideRight')?.querySelectorAll('[data-action]')||[]]; if (!btns.length) return; guideFocus=Math.min(guideFocus+1,btns.length-1); btns.forEach((b,i)=>b.classList.toggle('focus',i===guideFocus)); btns[guideFocus]?.scrollIntoView({block:'nearest'}); }
+function guideMoveUp()   { const btns = [...$('#guideRight')?.querySelectorAll('[data-action]')||[]]; if (!btns.length) return; guideFocus=Math.max(guideFocus-1,0); btns.forEach((b,i)=>b.classList.toggle('focus',i===guideFocus)); btns[guideFocus]?.scrollIntoView({block:'nearest'}); }
+function guideSelect(g)  { const btns = [...$('#guideRight')?.querySelectorAll('[data-action]')||[]]; if (btns[guideFocus]) guideAction(btns[guideFocus].dataset.action, g); }
+function guideSectionNav(dir) {
+  const idx = guideSections.findIndex(s=>s.id===guideSection);
+  const next = guideSections[Math.max(0,Math.min(guideSections.length-1,idx+dir))];
+  if (next && next.id !== guideSection) { guideSection=next.id; guideFocus=0; renderGuide(byId(cList[cFocus])); }
+}
 
 function renderAll() { renderSide(); renderMain(); renderDetail(); if (app.classList.contains('couch')) renderCouch(); }
 async function refresh(showToast) { S = await repro.scan(); if (showToast) toast(`rescanned: ${S.games.length} games`); renderAll(); }

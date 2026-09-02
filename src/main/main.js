@@ -382,6 +382,7 @@ function killRunning() {
 // Source: https://github.com/xan105/node-xinput-ffi
 let guidePoller = null;
 async function startGuideHook() {
+  if (process.argv.includes('--smoke')) return; // skip in test mode
   let xif;
   try { xif = await import('xinput-ffi'); } catch (e) { console.warn('xinput-ffi not available, Guide hook disabled:', e.message); return; }
   const { getStateEx, listConnected } = xif;
@@ -514,3 +515,4 @@ ipcMain.handle('restoreSave', (_, { id, file }) => { const g = library.games[id]
 ipcMain.handle('renameSlot', (_, { id, from, to }) => { const g = library.games[id]; if (!g) return { error: 'no such game' }; return renameSlot(g, from, to); });
 ipcMain.handle('deleteSlot', (_, { id, file }) => { const g = library.games[id]; if (!g) return { error: 'no such game' }; return deleteSlot(g, file); });
 ipcMain.handle('openSaveFolder', (_, id) => { const g = library.games[id]; if (!g) return; const d = getSaveDir(g); fs.mkdirSync(d, { recursive: true }); shell.openPath(d); });
+ipcMain.on('quit', () => app.quit());

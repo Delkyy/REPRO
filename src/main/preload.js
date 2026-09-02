@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('repro', {
   killRunning: call('killRunning'), isRunning: call('isRunning'), setHubKey: call('setHubKey'),
   listSlots: call('listSlots'), snapshotSave: call('snapshotSave'), restoreSave: call('restoreSave'),
   renameSlot: call('renameSlot'), deleteSlot: call('deleteSlot'), openSaveFolder: call('openSaveFolder'),
+  quit: () => ipcRenderer.send('quit'),
   onMenu: (fn) => ipcRenderer.on('menu', (_, cmd, arg) => fn(cmd, arg)),
   pathOf: (file) => webUtils.getPathForFile(file),
   onGameExited: (fn) => ipcRenderer.on('game-exited', (_, d) => fn(d)),

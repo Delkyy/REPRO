@@ -17,7 +17,10 @@ app.whenReady().then(async () => {
       const keepWhite = ${keepWhite};
       document.body.innerHTML = ${JSON.stringify(src)};
       const svg = document.querySelector('svg');
-      const isWhite = c => { if (!c || c === 'none') return false; const m = c.match(/\\d+/g); return m && m.length >= 3 && m.slice(0, 3).every(v => +v > 235); };
+      const isWhite = c => { if (!c || c === 'none') return false; const m = c.match(/[0-9]+/g); return m && m.length >= 3 && m.slice(0, 3).every(v => +v > 235); };
+      // fill-rule/evenodd holes: keep them, they're how counters are cut. inkscape puts it in style= (often on a parent <g>),
+      // and we strip style, so pin the COMPUTED rule onto every drawn element as an attribute first.
+      svg.querySelectorAll('path,polygon').forEach(e => { if (getComputedStyle(e).fillRule === 'evenodd') e.setAttribute('fill-rule', 'evenodd'); });
       const drawn = [...svg.querySelectorAll('path,rect,circle,ellipse,polygon,polyline,line,text')];
       // decide which color is the ink: the color covering the most bbox area that isn't the biggest single plate
       const area = e => { const b = e.getBBox(); return b.width * b.height; };
@@ -40,7 +43,8 @@ app.whenReady().then(async () => {
       svg.querySelectorAll('*').forEach(n => { for (const a of ['opacity', 'fill-opacity', 'style', 'class', 'filter', 'mask', 'clip-path']) n.removeAttribute(a); });
       svg.querySelectorAll('g').forEach(g => { if (!g.querySelector('path,rect,circle,ellipse,polygon,polyline,line,text')) g.remove(); });
       const b = svg.getBBox(); const pad = Math.max(b.width, b.height) * 0.03;
-      svg.setAttribute('viewBox', [b.x - pad, b.y - pad, b.width + pad * 2, b.height + pad * 2].map(n => +n.toFixed(2)).join(' '));
+      // inkscape files sometimes carry viewBox="0 0 1 1" + a scaling transform; getBBox on the root ignores the root transform, which is what we want
+      svg.setAttribute('viewBox', [b.x - pad, b.y - pad, b.width + pad * 2, b.height + pad * 2].map(n => +n.toFixed(3)).join(' '));
       for (const a of ['width', 'height', 'style', 'xml:space', 'id', 'sodipodi:docname', 'inkscape:version']) svg.removeAttribute(a);
       return { svg: svg.outerHTML, removed, kept: svg.querySelectorAll('path,rect,circle,ellipse,polygon,polyline,line,text').length, colors: Object.fromEntries(Object.entries(byColor).map(([c, es]) => [c, es.length])) };
     })()`);

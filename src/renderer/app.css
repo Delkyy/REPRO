@@ -288,3 +288,40 @@ input[type=range]{accent-color:var(--accent)}
 }
 .crow[data-skin="wii"] .ctile.focus{animation: wiiBounce .35s ease-out, focusIn .22s ease-out, focusGlow 2.6s ease-in-out .22s infinite}
 @keyframes wiiBounce{0%{transform:scale(1)}45%{transform:scale(1.18) translateY(-4px)}100%{transform:scale(1.1) translateY(-4px)}}
+
+/* ---- guide overlay (couch mode, Start/Menu button) ---- */
+.guide{position:fixed;inset:0;display:none;z-index:30;align-items:center;justify-content:center}
+.guide.open{display:flex}
+.guide .scrim{position:absolute;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(6px)}
+.guide .box{position:relative;z-index:1;display:grid;grid-template-columns:280px 1fr;width:min(calc(900px*var(--u,1)),96vw);max-height:90vh;overflow:hidden;border-radius:14px;border:1px solid var(--line);box-shadow:0 30px 80px rgba(0,0,0,.7);animation:guideIn .2s ease-out}
+@keyframes guideIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+.guide .left{background:var(--bg2);padding:calc(22px*var(--u,1));display:flex;flex-direction:column;gap:calc(6px*var(--u,1));border-right:1px solid var(--line)}
+.guide .right{background:var(--panel);padding:calc(22px*var(--u,1));overflow-y:auto}
+.guide .gtime{font-family:var(--mono);font-size:calc(28px*var(--u,1));font-weight:700;color:var(--fg);letter-spacing:.05em;margin-bottom:calc(12px*var(--u,1))}
+.guide .gdate{font-family:var(--mono);font-size:calc(12px*var(--u,1));color:var(--muted);margin-top:-8px;margin-bottom:calc(16px*var(--u,1))}
+.guide .gsep{height:1px;background:var(--line);margin:calc(8px*var(--u,1)) 0}
+.guide .gitem{display:flex;align-items:center;gap:calc(12px*var(--u,1));padding:calc(10px*var(--u,1)) calc(12px*var(--u,1));border-radius:8px;font-size:calc(14px*var(--u,1));font-weight:600;color:var(--muted);cursor:pointer;transition:background .1s}
+.guide .gitem:hover,.guide .gitem.on{background:var(--panel2);color:var(--fg)}
+.guide .gitem.on{box-shadow:inset 3px 0 0 var(--accent)}
+.guide .gitem .ico{width:calc(36px*var(--u,1));height:calc(36px*var(--u,1));border-radius:8px;display:grid;place-items:center;font-size:calc(18px*var(--u,1));flex:none;background:var(--panel)}
+.guide .gitem.on .ico{background:var(--accent);color:#fff}
+.guide .gitem.acc{color:var(--accent)}
+.guide .gitem.acc .ico{background:rgba(255,45,111,.15)}
+.guide h4{font-family:var(--display);font-size:calc(11px*var(--u,1));letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:calc(10px*var(--u,1))}
+.guide .game-card{display:flex;gap:calc(14px*var(--u,1));align-items:flex-end;margin-bottom:calc(20px*var(--u,1))}
+.guide .game-card .cover{width:calc(70px*var(--u,1));border-radius:6px;overflow:hidden;flex:none;background:var(--bg2);aspect-ratio:3/4.2}
+.guide .game-card .cover img{width:100%;height:100%;object-fit:cover}
+.guide .game-card h3{font-family:var(--display);font-size:calc(18px*var(--u,1));font-weight:700;line-height:1.1;margin-bottom:calc(4px*var(--u,1))}
+.guide .game-card .meta{font-size:calc(12px*var(--u,1));color:var(--muted)}
+.guide .gbtn{display:flex;align-items:center;gap:calc(10px*var(--u,1));padding:calc(12px*var(--u,1)) calc(14px*var(--u,1));border-radius:8px;border:1px solid var(--line);font-size:calc(14px*var(--u,1));font-weight:700;width:100%;margin-bottom:calc(8px*var(--u,1));background:var(--bg2);transition:border-color .15s,background .15s;cursor:pointer;color:var(--fg)}
+.guide .gbtn:hover,.guide .gbtn.focus{border-color:var(--accent);background:var(--panel2)}
+.guide .gbtn.primary{background:var(--accent);border-color:transparent;color:#fff}
+.guide .gbtn.primary:hover,.guide .gbtn.primary.focus{filter:brightness(1.1)}
+.guide .gbtn .k{width:calc(28px*var(--u,1));height:calc(28px*var(--u,1));border-radius:50%;background:rgba(255,255,255,.15);display:grid;place-items:center;font-size:calc(11px*var(--u,1));font-weight:800;flex:none}
+.guide .gbtn.primary .k{background:rgba(255,255,255,.25)}
+.guide .slots-mini{display:flex;gap:8px;flex-wrap:wrap;margin-top:calc(10px*var(--u,1))}
+.guide .slots-mini .sm{padding:calc(6px*var(--u,1)) calc(10px*var(--u,1));border:1px solid var(--line);border-radius:6px;font-size:calc(11px*var(--u,1));font-family:var(--mono);color:var(--muted);cursor:pointer}
+.guide .slots-mini .sm:hover{border-color:var(--fg);color:var(--fg)}
+.guide .slots-mini .sm.act{border-color:var(--accent);color:var(--accent)}
+.guide .hints{display:flex;gap:calc(18px*var(--u,1));flex-wrap:wrap;margin-top:calc(16px*var(--u,1));padding-top:calc(12px*var(--u,1));border-top:1px solid var(--line);font-size:calc(11px*var(--u,1));color:var(--muted)}
+.guide .hints .b{display:inline-grid;place-items:center;width:calc(18px*var(--u,1));height:calc(18px*var(--u,1));border-radius:50%;border:1.5px solid var(--muted);font-weight:800;font-size:calc(9px*var(--u,1));margin-right:4px;color:var(--fg)}
