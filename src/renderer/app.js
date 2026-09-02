@@ -246,10 +246,12 @@ async function openSettings() {
     <h5>Emulators</h5>${emuRows || '<div class="hint">none found.</div>'}<button class="btnrow" id="mAddExe" style="margin-top:8px;display:block;padding:7px 12px;border:1px solid var(--line);border-radius:6px">add exe…</button>
     <h5 style="margin-top:16px">Rom folders</h5>${dirRows || '<div class="hint">none yet.</div>'}<button id="mAddDir" style="margin-top:8px;display:block;padding:7px 12px;border:1px solid var(--line);border-radius:6px">+ add folder…</button>
     <h5 style="margin-top:16px">Config</h5><div class="hint">everything lives next to the app: ${esc(ROOT)}</div>
+    <h5 style="margin-top:16px">Hub key</h5><div class="hint">press <code style="background:var(--panel);padding:2px 6px;border-radius:4px">${esc(S.config.hubKey || 'Shift+F12')}</code> anywhere, even with the emulator focused, to close the running game and jump back to REPRO. map a controller's Guide/Home button to it in Windows or Steam Input for a one-button "back to hub". <button id="mHubKey" style="margin-top:6px;display:block;padding:6px 10px;border:1px solid var(--line);border-radius:6px">change…</button></div>
     </div></div>`;
   $('#mClose').onclick = () => $('#modal').classList.remove('open');
   $('#modal').querySelectorAll('[data-exe]').forEach(b => b.onclick = async () => { const found2 = b.dataset.found; const p = found2 || await repro.pickExe(); if (p) { S = await repro.setEmulator({ id: b.dataset.exe, exe: p }); openSettings(); } });
   $('#mAddExe').onclick = addExe;
+  const mhk = $('#mHubKey'); if (mhk) mhk.onclick = async () => { await changeHubKey(); openSettings(); };
   $('#mAddDir').onclick = async () => { const d = await repro.pickFolder(); if (d) { S = await repro.addRomDir({ dir: d }); openSettings(); renderAll(); } };
   $('#modal').querySelectorAll('[data-rm]').forEach(b => b.onclick = async () => { S = await repro.removeRomDir(b.dataset.rm); openSettings(); renderAll(); });
   $('#modal').classList.add('open');
@@ -278,8 +280,16 @@ $('#cov').onclick = e => { if (e.target.id == 'cov') $('#cov').classList.remove(
 $('#modal').onclick = e => { if (e.target.id == 'modal') $('#modal').classList.remove('open'); };
 repro.onMenu((cmd, arg) => {
   ({ addRomDir: () => $('#railAdd').click(), addExe, rescan: () => refresh(true), setup: openSettings, duplicates: openDuplicates,
-     search: () => { $('#q').focus(); }, mode: () => setMode(arg), theme: () => setTheme(arg), ui: () => setUI(arg) })[cmd]?.();
+     search: () => { $('#q').focus(); }, mode: () => setMode(arg), theme: () => setTheme(arg), ui: () => setUI(arg),
+     toast: () => toast(arg), hubkey: changeHubKey })[cmd]?.();
 });
+async function changeHubKey() {
+  const cur = S.config.hubKey || 'Shift+F12';
+  const k = prompt(`key combo to close the running game and jump back to REPRO, from anywhere (even while the emulator has focus).\nexamples: Shift+F12, Ctrl+Alt+Q, F13\n\ncurrent: ${cur}`, cur);
+  if (!k) return;
+  const newKey = await repro.setHubKey(k);
+  S.config.hubKey = newKey; toast(`hub key set to <b>${esc(newKey)}</b>. map your controller's Guide/Home button to this in Windows or Steam Input to trigger it from the pad.`);
+}
 document.addEventListener('keydown', e => {
   if ($('#modal').classList.contains('open')) { if (e.key == 'Escape') $('#modal').classList.remove('open'); return; }
   if (e.target.tagName == 'INPUT') { if (e.key == 'Escape') e.target.blur(); return; }
