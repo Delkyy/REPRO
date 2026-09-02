@@ -336,17 +336,28 @@ document.addEventListener('drop', async e => {
 setInterval(() => { const c = $('#clock'); if (c) c.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }, 1000);
 
 // ---------- gamepad: standard mapping (https://w3c.github.io/gamepad/#remapping). A=0 B=1 X=2 Y=3, dpad 12-15, left stick axes 0/1
+// stick reading uses hysteresis (engage high, release low) so one flick can't flicker across a single
+// threshold and fire twice, plus a longer initial hold before auto-repeat kicks in.
 let padPrev = {}, padHeld = 0;
+let stickLatch = { x: 0, y: 0 }; // -1/0/1, only clears once the stick returns near center
+const STICK_ENGAGE = 0.55, STICK_RELEASE = 0.25;
+function readStickAxis(v, latchKey) {
+  if (Math.abs(v) < STICK_RELEASE) stickLatch[latchKey] = 0;
+  else if (stickLatch[latchKey] === 0 && Math.abs(v) > STICK_ENGAGE) stickLatch[latchKey] = v > 0 ? 1 : -1;
+  return stickLatch[latchKey];
+}
 function pollPad() {
   const gp = navigator.getGamepads?.()[0];
   if (gp && app.classList.contains('couch') && !$('#modal').classList.contains('open')) {
     const b = i => gp.buttons[i]?.pressed, ax = gp.axes;
-    const now = { up: b(12) || ax[1] < -.5, down: b(13) || ax[1] > .5, left: b(14) || ax[0] < -.5, right: b(15) || ax[0] > .5, a: b(0), bb: b(1), x: b(2), y: b(3), sel: b(8) };
+    const sx = readStickAxis(ax[0], 'x'), sy = readStickAxis(ax[1], 'y');
+    const now = { up: b(12) || sy < 0, down: b(13) || sy > 0, left: b(14) || sx < 0, right: b(15) || sx > 0, a: b(0), bb: b(1), x: b(2), y: b(3), sel: b(8) };
     const edge = k => now[k] && !padPrev[k];
     const ovOpen = $('#cov').classList.contains('open');
     if (ovOpen) { if (edge('a')) launch(cList[cFocus]); if (edge('bb')) $('#cov').classList.remove('open'); }
     else {
-      const rep = (k, key) => { if (now[k] && (edge(k) || (padHeld > 18 && padHeld % 5 == 0))) cKey(key); };
+      // 28 frames (~470ms) before repeat starts, then one step every 9 frames (~150ms) — a quick flick moves exactly one
+      const rep = (k, key) => { if (now[k] && (edge(k) || (padHeld > 28 && padHeld % 9 == 0))) cKey(key); };
       rep('up', 'ArrowUp'); rep('down', 'ArrowDown'); rep('left', 'ArrowLeft'); rep('right', 'ArrowRight');
       if (edge('a')) cOpen(); if (edge('x')) cKey('x'); if (edge('y')) cKey('y'); if (edge('sel')) setMode('desktop');
     }
