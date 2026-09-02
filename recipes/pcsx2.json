@@ -1,0 +1,45 @@
+{
+  "id": "pcsx2",
+  "name": "PCSX2",
+  "systems": [
+    "ps2"
+  ],
+  "exe": [
+    "pcsx2-qt.exe",
+    "pcsx2-qtx64*.exe",
+    "pcsx2*.exe"
+  ],
+  "extensions": {
+    "ps2": [
+      ".iso",
+      ".chd",
+      ".cso",
+      ".zso",
+      ".gz",
+      ".bin",
+      ".elf"
+    ]
+  },
+  "args": {
+    "ps2": [
+      "-batch",
+      "-fullscreen",
+      "{rom}"
+    ]
+  },
+  "dataDirs": [
+    "{exe}/portable.ini?{exe}",
+    "{docs}/PCSX2"
+  ],
+  "saves": {
+    "ps2": "{data}/memcards"
+  },
+  "states": {
+    "ps2": "{data}/sstates"
+  },
+  "source": {
+    "url": "https://github.com/PCSX2/pcsx2/blob/master/pcsx2-qt/QtHost.cpp",
+    "checked": "2026-09-01",
+    "note": "-batch exits after shutdown, -fullscreen, -nogui, -fastboot, -bigpicture"
+  }
+}

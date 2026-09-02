@@ -1,0 +1,50 @@
+{
+  "id": "dolphin",
+  "name": "Dolphin",
+  "systems": [
+    "gc",
+    "wii"
+  ],
+  "exe": [
+    "Dolphin.exe"
+  ],
+  "extensions": {
+    "gc": [
+      ".iso",
+      ".ciso",
+      ".gcz",
+      ".rvz",
+      ".gcm",
+      ".wbfs"
+    ],
+    "wii": [
+      ".iso",
+      ".rvz",
+      ".wbfs"
+    ]
+  },
+  "args": {
+    "gc": [
+      "--batch",
+      "--exec={rom}"
+    ],
+    "wii": [
+      "--batch",
+      "--exec={rom}"
+    ]
+  },
+  "dataDirs": [
+    "{exe}/User",
+    "{docs}/Dolphin Emulator",
+    "{appdata}/Dolphin Emulator"
+  ],
+  "saves": {
+    "gc": "{data}/GC",
+    "wii": "{data}/Wii/title"
+  },
+  "source": {
+    "url": "https://github.com/dolphin-emu/dolphin/blob/master/Readme.md",
+    "checked": "2026-09-01",
+    "note": "-b/--batch runs without ui, requires --exec=<file>"
+  }
+}

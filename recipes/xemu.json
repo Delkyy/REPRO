@@ -1,0 +1,35 @@
+{
+  "id": "xemu",
+  "name": "xemu",
+  "systems": [
+    "xbox"
+  ],
+  "exe": [
+    "xemu.exe"
+  ],
+  "extensions": {
+    "xbox": [
+      ".iso",
+      ".xiso"
+    ]
+  },
+  "args": {
+    "xbox": [
+      "-full-screen",
+      "-dvd_path",
+      "{rom}"
+    ]
+  },
+  "dataDirs": [
+    "{exe}/xemu.toml?{exe}",
+    "{appdata}/xemu/xemu"
+  ],
+  "saves": {
+    "xbox": "hdd-image"
+  },
+  "source": {
+    "url": "https://github.com/xemu-project/xemu/blob/master/system/vl.c",
+    "checked": "2026-09-01",
+    "note": "-dvd_path <iso> parsed in vl.c; -full-screen is the qemu option in qemu-options.hx. saves live inside the hdd qcow2, path in xemu.toml sys.files.hdd_path"
+  }
+}

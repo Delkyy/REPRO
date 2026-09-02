@@ -1,0 +1,46 @@
+{
+  "id": "duckstation",
+  "name": "DuckStation",
+  "systems": [
+    "ps1"
+  ],
+  "exe": [
+    "duckstation-qt-x64-ReleaseLTCG.exe",
+    "duckstation-qt*.exe",
+    "duckstation*.exe"
+  ],
+  "extensions": {
+    "ps1": [
+      ".cue",
+      ".chd",
+      ".m3u",
+      ".pbp",
+      ".ecm",
+      ".mds",
+      ".psexe",
+      ".exe"
+    ]
+  },
+  "args": {
+    "ps1": [
+      "-batch",
+      "-fullscreen",
+      "{rom}"
+    ]
+  },
+  "dataDirs": [
+    "{exe}/portable.txt?{exe}",
+    "{docs}/DuckStation"
+  ],
+  "saves": {
+    "ps1": "{data}/memcards"
+  },
+  "states": {
+    "ps1": "{data}/savestates"
+  },
+  "source": {
+    "url": "https://github.com/stenzek/duckstation/blob/master/src/duckstation-qt/qthost.cpp",
+    "checked": "2026-09-01",
+    "note": "-batch exits after power off, -fullscreen, -nogui, -fastboot, -bigpicture"
+  }
+}

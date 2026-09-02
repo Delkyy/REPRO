@@ -1,0 +1,23 @@
+{
+  "name": "repro",
+  "version": "0.1.0",
+  "description": "REPRO: open-source emulator hub",
+  "main": "src/main/main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron .",
+    "dist": "electron-builder --win portable"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^44.1.1",
+    "electron-builder": "^26.15.3"
+  },
+  "allowScripts": {
+    "electron@44.1.1": true,
+    "electron-winstaller@5.4.0": true
+  }
+}

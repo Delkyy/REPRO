@@ -1,7 +1,9 @@
-library.db
+library.json
+config.json
 art/
 saves/
 emulators/
 roms/
 node_modules/
+dist/
 sketches/shot-*.png
