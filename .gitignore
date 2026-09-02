@@ -1,0 +1,7 @@
+library.db
+art/
+saves/
+emulators/
+roms/
+node_modules/
+sketches/shot-*.png

@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>REPRO — sketch 001</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* ---------- theme tokens: this block IS a theme file ---------- */
+:root, [data-theme="slate"] {
+  --bg:#0e1014; --bg2:#151821; --panel:#1b1f2a; --line:#262b38;
+  --fg:#e7eaf0; --muted:#8a91a3; --accent:#ff4d4d; --accent2:#ffb02e;
+  --radius:10px; --font:"Inter",system-ui,sans-serif; --mono:"JetBrains Mono",monospace;
+  --card-glow:0 0 0 3px var(--accent), 0 18px 40px rgba(0,0,0,.6);
+}
+[data-theme="crt"] {
+  --bg:#050806; --bg2:#0a120c; --panel:#0d1a10; --line:#173a20;
+  --fg:#c9ffd0; --muted:#5fa66a; --accent:#39ff6a; --accent2:#ffe45c;
+  --radius:2px; --font:"JetBrains Mono",monospace; --mono:"JetBrains Mono",monospace;
+  --card-glow:0 0 0 2px var(--accent), 0 0 30px rgba(57,255,106,.35);
+}
+[data-theme="paper"] {
+  --bg:#f3efe6; --bg2:#ece6d8; --panel:#fffdf7; --line:#d9d1bf;
+  --fg:#1d1a14; --muted:#7a7263; --accent:#c8321f; --accent2:#e58f1f;
+  --radius:14px; --font:"Inter",system-ui,sans-serif; --mono:"JetBrains Mono",monospace;
+  --card-glow:0 0 0 3px var(--accent), 0 14px 30px rgba(60,40,10,.25);
+}
+[data-theme="crt"] body::after{content:"";position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 2px,transparent 2px 4px);z-index:99}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);-webkit-font-smoothing:antialiased;overflow:hidden;transition:background .3s,color .3s}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+img{display:block}
+
+/* ---------- top bar ---------- */
+.top{height:56px;display:flex;align-items:center;gap:18px;padding:0 20px;border-bottom:1px solid var(--line);background:var(--bg2)}
+.wordmark{font-weight:800;letter-spacing:.18em;font-size:18px}
+.wordmark b{color:var(--accent)}
+.seg{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{padding:6px 14px;font-size:12px;font-weight:600;color:var(--muted)}
+.seg button.on{background:var(--accent);color:#fff}
+[data-theme="paper"] .seg button.on{color:#fff}
+.search{flex:1;max-width:420px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 14px;font-size:13px;color:var(--muted);display:flex;gap:8px;align-items:center}
+.search input{background:none;border:0;color:var(--fg);outline:0;flex:1;font:inherit}
+.spacer{flex:1}
+.themes{display:flex;gap:6px;align-items:center;font-size:11px;color:var(--muted)}
+.swatch{width:18px;height:18px;border-radius:50%;border:2px solid var(--line)}
+.swatch.on{border-color:var(--fg)}
+.icon{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);color:var(--muted);font-size:16px}
+.icon:hover{color:var(--fg);border-color:var(--fg)}
+kbd{font-family:var(--mono);font-size:10px;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--muted)}
+
+/* ---------- desktop layout ---------- */
+.desk{display:none;height:calc(100% - 56px)}
+body[data-mode="desktop"] .desk{display:grid;grid-template-columns:220px 1fr 340px}
+.side{border-right:1px solid var(--line);padding:16px 10px;background:var(--bg2);overflow:auto}
+.side h4{font-size:10px;letter-spacing:.14em;color:var(--muted);padding:12px 10px 6px;text-transform:uppercase}
+.side button{display:flex;width:100%;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;font-size:13px;color:var(--muted)}
+.side button .n{margin-left:auto;font-family:var(--mono);font-size:11px;opacity:.7}
+.side button:hover{background:var(--panel);color:var(--fg)}
+.side button.on{background:var(--panel);color:var(--fg);box-shadow:inset 3px 0 0 var(--accent)}
+.side .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.side .dot.ok{background:#3ddc84}.side .dot.warn{background:var(--accent2)}
+.main{overflow:auto;padding:20px 24px}
+.main h2{font-size:22px;font-weight:800;margin-bottom:4px}
+.main .sub{color:var(--muted);font-size:13px;margin-bottom:18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:18px}
+.card{position:relative;border-radius:var(--radius);overflow:hidden;background:var(--panel);aspect-ratio:3/4.2;cursor:pointer;transition:transform .12s,box-shadow .12s;border:1px solid var(--line)}
+.card img{width:100%;height:100%;object-fit:cover}
+.card:hover,.card.sel{transform:translateY(-3px);box-shadow:var(--card-glow)}
+.card .noart{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:12px 12px 30px;font-weight:600;font-size:13px;line-height:1.2;background:linear-gradient(160deg,var(--bg2),var(--panel))}
+.card .noart small{color:var(--muted);font-weight:500;margin-top:4px;font-size:11px}
+.card .tag{position:absolute;top:8px;left:8px;font-family:var(--mono);font-size:9px;letter-spacing:.08em;padding:3px 6px;border-radius:4px;background:rgba(0,0,0,.65);color:#fff}
+.card .fav{position:absolute;top:6px;right:8px;color:var(--accent2);font-size:14px;text-shadow:0 1px 3px #000}
+.card .pt{position:absolute;bottom:0;left:0;right:0;padding:6px 8px;font-size:10px;font-family:var(--mono);background:linear-gradient(transparent,rgba(0,0,0,.85));color:#ddd}
+.detail{border-left:1px solid var(--line);background:var(--bg2);overflow:auto;padding:0}
+.detail .hero{aspect-ratio:3/2;background:var(--panel);overflow:hidden;position:relative}
+.detail .hero img{width:100%;height:100%;object-fit:cover;filter:blur(18px) brightness(.5);transform:scale(1.2)}
+.detail .hero .cover{position:absolute;left:18px;bottom:-40px;width:110px;border-radius:6px;box-shadow:0 10px 30px rgba(0,0,0,.6);overflow:hidden;background:var(--panel)}
+.detail .hero .cover img{filter:none;transform:none;aspect-ratio:3/4.2;object-fit:cover}
+.detail .body{padding:52px 18px 18px}
+.detail h3{font-size:18px;font-weight:800;line-height:1.15}
+.meta{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:var(--muted);margin:8px 0 14px;font-family:var(--mono)}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:8px;font-weight:700;font-size:13px;border:1px solid var(--line)}
+.btn.primary{background:var(--accent);color:#fff;border-color:transparent;width:100%;justify-content:center;font-size:15px;padding:12px}
+.btn.primary:hover{filter:brightness(1.1)}
+.row{display:flex;gap:8px;margin-top:8px}
+.row .btn{flex:1;justify-content:center;font-size:12px;padding:8px}
+.sect{margin-top:20px}
+.sect h5{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:center}
+.sect h5 a{margin-left:auto;color:var(--accent);font-size:11px;letter-spacing:0;text-transform:none;cursor:pointer}
+.slot{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;border:1px solid var(--line);margin-bottom:6px;font-size:12px;background:var(--panel)}
+.slot .sh{width:44px;height:30px;border-radius:4px;background:linear-gradient(135deg,#3a4a7a,#1f2b4d);flex:none}
+.slot .t{flex:1;line-height:1.2}
+.slot .t small{display:block;color:var(--muted);font-family:var(--mono);font-size:10px;margin-top:2px}
+.slot .act{opacity:0;display:flex;gap:4px}
+.slot:hover .act{opacity:1}
+.slot .act button{padding:3px 7px;border:1px solid var(--line);border-radius:5px;font-size:11px}
+.slot .act button:hover{border-color:var(--fg)}
+.slot.auto .sh{background:linear-gradient(135deg,#555,#333)}
+.kv{display:grid;grid-template-columns:1fr auto;gap:6px 10px;font-size:12px}
+.kv span{color:var(--muted)}
+.kv select{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:3px 6px;font:inherit;font-size:12px}
+.kv code{font-family:var(--mono);font-size:11px;color:var(--fg)}
+.empty{color:var(--muted);font-size:13px;padding:40px;text-align:center}
+
+/* ---------- couch layout ---------- */
+.couch{display:none;height:calc(100% - 56px);overflow:auto;padding:18px 0 60px;scroll-behavior:smooth}
+body[data-mode="couch"] .couch{display:block}
+body[data-mode="couch"] .top{background:transparent;border:0;position:absolute;width:100%;z-index:5;background:linear-gradient(var(--bg),transparent)}
+body[data-mode="couch"] .couch{height:100%;padding-top:70px}
+.crow{margin-bottom:26px}
+.crow h3{font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:0 48px;margin-bottom:10px;display:flex;gap:10px;align-items:center}
+.crow h3 b{color:var(--fg);font-weight:800;letter-spacing:.06em;text-transform:none;font-size:20px}
+.crow .strip{display:flex;gap:16px;padding:14px 48px;overflow-x:auto;overflow-y:visible;scrollbar-width:none}
+.crow .strip::-webkit-scrollbar{display:none}
+.tile{flex:none;width:170px;aspect-ratio:3/4.2;border-radius:var(--radius);overflow:hidden;background:var(--panel);border:1px solid var(--line);position:relative;transition:transform .15s,box-shadow .15s}
+.tile img{width:100%;height:100%;object-fit:cover}
+.tile.focus{transform:scale(1.14);box-shadow:var(--card-glow);z-index:2}
+.tile .noart{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:14px;font-weight:700;font-size:15px;line-height:1.15;background:linear-gradient(160deg,var(--bg2),var(--panel))}
+.tile .noart small{color:var(--muted);font-weight:500;font-size:11px;margin-top:4px}
+.tile.wide{width:300px;aspect-ratio:16/9}
+.tile.wide img.bd{position:absolute;inset:0;filter:blur(14px) brightness(.55);transform:scale(1.3)}
+.tile.wide img.cv{position:absolute;left:14px;top:12px;height:calc(100% - 24px);width:auto;border-radius:4px;box-shadow:0 6px 18px rgba(0,0,0,.6)}
+.tile.wide .cap{position:absolute;left:118px;right:0;bottom:0;top:0;padding:14px 14px 14px 0;display:flex;flex-direction:column;justify-content:flex-end;color:#fff;font-weight:700;font-size:15px;line-height:1.15;text-shadow:0 1px 4px #000}
+.tile.wide .noart+.cap{left:14px}
+.tile.wide .cap small{display:block;font-weight:500;font-size:11px;color:#bbb;font-family:var(--mono);margin-top:2px}
+.tile.add{display:grid;place-items:center;color:var(--muted);font-size:40px;border-style:dashed}
+.hud{position:fixed;bottom:0;left:0;right:0;padding:12px 48px;display:flex;gap:22px;font-size:12px;color:var(--muted);background:linear-gradient(transparent,var(--bg) 40%);z-index:5;pointer-events:none}
+.hud .b{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;border:2px solid var(--muted);font-weight:800;font-size:10px;margin-right:6px;color:var(--fg)}
+body[data-mode="desktop"] .hud{display:none}
+.hud .now{margin-left:auto;font-family:var(--mono)}
+
+/* ---------- couch overlay ---------- */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(10px);display:none;z-index:20;align-items:center;justify-content:center}
+.ov.open{display:flex}
+.ov .box{width:min(980px,90vw);background:var(--bg2);border:1px solid var(--line);border-radius:16px;display:grid;grid-template-columns:260px 1fr;overflow:hidden}
+.ov .box img.big{width:100%;aspect-ratio:3/4.2;object-fit:cover}
+.ov .noart{aspect-ratio:3/4.2;display:grid;place-items:center;color:var(--muted);background:var(--panel)}
+.ov .body{padding:28px}
+.ov h2{font-size:30px;font-weight:800;line-height:1.05}
+.ov .big-btns{display:flex;gap:10px;margin:18px 0}
+.ov .big-btns .btn{padding:14px 22px;font-size:15px;border-radius:12px}
+.ov .big-btns .btn.f{box-shadow:var(--card-glow)}
+.ov .slots{display:flex;gap:10px;margin-top:8px}
+.ov .slots .slot{flex-direction:column;align-items:flex-start;width:140px;padding:10px}
+.ov .slots .slot .sh{width:100%;height:60px}
+.ov .slots .slot.f{box-shadow:var(--card-glow)}
+.ov .desc{color:var(--muted);font-size:14px;line-height:1.55;margin-top:14px;max-width:560px}
+
+/* ---------- drop overlay ---------- */
+.drop{position:fixed;inset:16px;border:3px dashed var(--accent);border-radius:20px;background:rgba(0,0,0,.55);display:none;place-items:center;z-index:50;font-size:28px;font-weight:800;text-align:center;line-height:1.3}
+.drop small{display:block;font-size:14px;font-weight:500;color:var(--muted);margin-top:8px}
+body.dragging .drop{display:grid}
+.toast{position:fixed;left:50%;bottom:70px;transform:translateX(-50%) translateY(20px);background:var(--panel);border:1px solid var(--line);padding:12px 18px;border-radius:12px;font-size:13px;opacity:0;transition:.25s;z-index:60;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.toast b{color:var(--accent)}
+</style>
+</head>
+<body data-mode="desktop" data-theme="slate">
+
+<div class="top">
+  <div class="wordmark">REP<b>RO</b></div>
+  <div class="seg" id="modeSeg">
+    <button data-m="desktop" class="on">Desktop</button>
+    <button data-m="couch">Couch</button>
+  </div>
+  <label class="search">⌕ <input id="q" placeholder="search 22 games…  (type anywhere)"><kbd>/</kbd></label>
+  <div class="spacer"></div>
+  <div class="themes">theme
+    <button class="swatch on" data-t="slate" style="background:#1b1f2a" title="slate"></button>
+    <button class="swatch" data-t="crt" style="background:#39ff6a" title="crt"></button>
+    <button class="swatch" data-t="paper" style="background:#fffdf7" title="paper"></button>
+  </div>
+  <button class="icon" title="add anything" onclick="toast('drop an exe, rom, folder or bios anywhere. or click <b>+</b> and browse.')">+</button>
+  <button class="icon" title="settings">⚙</button>
+</div>
+
+<!-- ================= DESKTOP ================= -->
+<div class="desk">
+  <nav class="side" id="side"></nav>
+  <section class="main">
+    <h2 id="title">All games</h2>
+    <div class="sub" id="sub"></div>
+    <div class="grid" id="grid"></div>
+  </section>
+  <aside class="detail" id="detail"><div class="empty">pick a game</div></aside>
+</div>
+
+<!-- ================= COUCH ================= -->
+<div class="couch" id="couch"></div>
+<div class="hud">
+  <span><span class="b">A</span>play</span>
+  <span><span class="b">Y</span>saves</span>
+  <span><span class="b">X</span>random</span>
+  <span><span class="b">▤</span>desktop</span>
+  <span class="now" id="clock"></span>
+</div>
+
+<div class="ov" id="ov"></div>
+<div class="drop">drop it here<small>exe · rom · folder · bios · anything. REPRO figures out what it is.</small></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const ART='../art/';
+const G=[
+ // gamecube
+ {id:1,t:'Super Mario Strikers',sys:'gc',art:'G4QE01.png',pt:'6h 20m',last:'yesterday',fav:1,y:2005,emu:'Dolphin',file:'Super Mario Strikers (USA).nkit.iso'},
+ {id:2,t:'Super Monkey Ball 2',sys:'gc',art:'GM2E8P.png',pt:'1h 05m',last:'3 days ago',y:2002,emu:'Dolphin',file:'Super Monkey Ball 2 (USA).ciso'},
+ {id:3,t:'Mario Golf: Toadstool Tour',sys:'gc',art:'GFTE01.png',pt:'2h 40m',last:'last week',y:2003,emu:'Dolphin',file:'Mario Golf - Toadstool Tour (USA).ciso'},
+ {id:4,t:'NBA Street Vol. 2',sys:'gc',art:'GNZE69.png',pt:'45m',last:'aug 12',y:2003,emu:'Dolphin',file:'NBA Street Vol. 2 (USA).ciso'},
+ {id:5,t:'Harvest Moon: A Wonderful Life',sys:'gc',art:'GYWEE9.png',pt:'—',last:'never',y:2004,emu:'Dolphin',file:'Harvest Moon - A Wonderful Life (USA).nkit.iso'},
+ {id:6,t:'True Crime: New York City',sys:'gc',art:'G2CE52.png',pt:'—',last:'never',y:2005,emu:'Dolphin',file:'True Crime - New York City (USA).nkit.iso'},
+ // ps2
+ {id:7,t:'Dragon Ball Z: Budokai Tenkaichi 3',sys:'ps2',art:null,pt:'3h 10m',last:'2 days ago',fav:1,y:2007,emu:'PCSX2',file:'Dragon Ball Z - Budokai Tenkaichi 3 (USA).iso'},
+ {id:8,t:'EverQuest Online Adventures',sys:'ps2',art:'SLUS-20470.png',pt:'—',last:'never',y:2003,emu:'PCSX2',file:'EverQuest - Online Adventures (USA).iso'},
+ {id:9,t:'EverQuest OA: Frontiers',sys:'ps2',art:'SLUS-20744.jpg',pt:'—',last:'never',y:2003,emu:'PCSX2',file:'EverQuest - Online Adventures - Frontiers (USA).iso'},
+ {id:10,t:'Fullmetal Alchemist and the Broken Angel',sys:'ps2',art:'Fullmetal_Alchemist_and_the_Broken_Angel.png',pt:'1h 55m',last:'aug 30',y:2003,emu:'PCSX2',file:'Fullmetal Alchemist and the Broken Angel (USA, Canada).iso'},
+ {id:11,t:'Harvest Moon: AWL Special Edition',sys:'ps2',art:'SLUS-21171.jpg',pt:'12h 08m',last:'today',fav:1,y:2005,emu:'PCSX2',file:'Harvest Moon - A Wonderful Life - Special Edition (USA).iso'},
+ {id:12,t:'The Sims 2',sys:'ps2',art:'Sims_2.png',pt:'4h 30m',last:'aug 20',y:2005,emu:'PCSX2',file:'Sims 2, The (USA).iso'},
+ {id:13,t:'The Sims 2: Castaway',sys:'ps2',art:'Sims_2-Castaway.png',pt:'—',last:'never',y:2007,emu:'PCSX2',file:'Sims 2, The - Castaway (USA).iso'},
+ // ps1
+ {id:14,t:'Metal Gear Solid',sys:'ps1',art:null,pt:'45m',last:'jul 1',y:1998,emu:'DuckStation',file:'Metal Gear Solid (USA) (Disc 1) (Rev 1).cue',serial:'SLUS-00594',discs:2},
+ {id:15,t:'Persona',sys:'ps1',art:'persona.png',pt:'—',last:'never',y:1996,emu:'DuckStation',file:'Persona (USA).cue',serial:'SLUS-00339'},
+ {id:16,t:'Persona 2: Innocent Sin',sys:'ps1',art:null,pt:'1h 24m',last:'aug 4',y:1999,emu:'DuckStation',file:'Persona 2 - Innocent Sin (T-En).cue',serial:'SLPS-02100'},
+ // xbox
+ {id:17,t:'Madden NFL 07',sys:'xbox',art:'Madden_NFL_07.png',pt:'8h 15m',last:'aug 28',fav:1,y:2006,emu:'xemu',file:'Madden NFL 07 (USA).iso'},
+ {id:18,t:'Madden NFL 07 (Hall of Fame)',sys:'xbox',art:null,pt:'—',last:'never',y:2006,emu:'xemu',file:'Madden NFL 07 (USA) (Hall of Fame Edition).iso'},
+ {id:19,t:'ESPN NFL 2K5',sys:'xbox',art:'ESPN_NFL_2K5.png',pt:'22h 40m',last:'today',fav:1,y:2004,emu:'xemu',file:'ESPN NFL 2K5 (USA).xiso.iso'},
+ {id:20,t:'Buffy the Vampire Slayer',sys:'xbox',art:'Buffy_the_Vampire_Slayer.png',pt:'—',last:'never',y:2002,emu:'xemu',file:'Buffy the Vampire Slayer (USA).7z'},
+ {id:21,t:'JSRF: Jet Set Radio Future',sys:'xbox',art:null,pt:'30m',last:'jul 19',y:2002,emu:'xemu',file:'JSRF - Jet Set Radio Future (USA).iso'},
+ // pc
+ {id:22,t:'NFL 2K24 (mod)',sys:'pc',art:null,pt:'5h 02m',last:'aug 25',y:2023,emu:'native',file:'NFL 2K24 Edition.lnk'},
+];
+const SYS={gc:{n:'GameCube',emu:'Dolphin',st:'ok'},ps2:{n:'PlayStation 2',emu:'PCSX2',st:'ok'},ps1:{n:'PlayStation',emu:'DuckStation',st:'ok'},xbox:{n:'Xbox',emu:'xemu',st:'ok'},x360:{n:'Xbox 360',emu:'xenia',st:'warn'},pc:{n:'PC',emu:'—',st:'ok'}};
+const SLOTS={
+ default:[{n:'Auto (before last launch)',d:'today 14:02',auto:1},{n:'slot 1',d:'aug 30 · 22:10'},{n:'before boss',d:'aug 28 · 19:41'}],
+ 14:[{n:'Auto (before last launch)',d:'jul 1 · 20:15',auto:1},{n:'SLUS-00594_1.sav',d:'jul 1 · 20:10'},{n:'resume',d:'jul 1 · 20:14'}],
+ 16:[{n:'Auto (before last launch)',d:'aug 4 · 23:30',auto:1},{n:'SLPS-02100_1.sav',d:'aug 4 · 23:29'}],
+};
+let filter='all', sel=null, focus=0, couchList=[];
+
+const body=document.body, $=s=>document.querySelector(s);
+const unsorted=['Mario Golf - Toadstool Tour (USA).7z','Fullmetal Alchemist and the Broken Angel (USA, Canada).7z','JSRF - Jet Set Radio Future (USA).xiso.iso'];
+
+function artEl(g,cls){ return g.art?`<img src="${ART+g.art}" alt="">`:`<div class="noart">${g.t}<small>${SYS[g.sys].n} · no art yet</small></div>`; }
+
+function renderSide(){
+  const counts={}; G.forEach(g=>counts[g.sys]=(counts[g.sys]||0)+1);
+  let h=`<h4>Library</h4>
+  <button data-f="all" class="${filter=='all'?'on':''}">All games<span class="n">${G.length}</span></button>
+  <button data-f="recent" class="${filter=='recent'?'on':''}">Continue<span class="n">5</span></button>
+  <button data-f="fav" class="${filter=='fav'?'on':''}">★ Favorites<span class="n">${G.filter(g=>g.fav).length}</span></button>
+  <h4>Systems</h4>`;
+  for(const k in SYS){ h+=`<button data-f="${k}" class="${filter==k?'on':''}"><span class="dot ${SYS[k].st}"></span>${SYS[k].n}<span class="n">${counts[k]||0}</span></button>`; }
+  h+=`<h4>Needs you</h4>
+  <button data-f="unsorted"><span class="dot warn"></span>Unsorted<span class="n">${unsorted.length}</span></button>
+  <button data-f="bios"><span class="dot warn"></span>Bios check<span class="n">1</span></button>
+  <h4>Collections</h4><button>Football<span class="n">4</span></button><button>Beat it<span class="n">2</span></button><button style="color:var(--accent)">+ new collection</button>`;
+  $('#side').innerHTML=h;
+  $('#side').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{filter=b.dataset.f;renderSide();renderGrid();});
+}
+function list(){
+  const q=($('#q').value||'').toLowerCase();
+  let l=G.filter(g=>!q||g.t.toLowerCase().includes(q));
+  if(filter=='fav') l=l.filter(g=>g.fav);
+  else if(filter=='recent') l=l.filter(g=>g.pt!='—').slice(0,5);
+  else if(SYS[filter]) l=l.filter(g=>g.sys==filter);
+  return l;
+}
+function renderGrid(){
+  const names={all:'All games',fav:'Favorites',recent:'Continue',unsorted:'Unsorted',bios:'Bios check'};
+  $('#title').textContent=names[filter]||SYS[filter].n;
+  if(filter=='unsorted'){
+    $('#sub').textContent='found these but not sure what they are. tell me and they become cards.';
+    $('#grid').style.display='block';
+    $('#grid').innerHTML=unsorted.map(u=>`<div class="slot"><div class="sh" style="background:var(--bg)"></div><div class="t">${u}<small>looks like a duplicate of a game already in the library</small></div><div class="act" style="opacity:1"><button onclick="toast('hidden. it stays on disk, REPRO just stops asking.')">hide</button><button>assign system…</button><button>delete file</button></div></div>`).join('');
+    return;
+  }
+  if(filter=='bios'){
+    $('#sub').textContent='what each emulator wants, and whether it has it.';
+    $('#grid').style.display='block';
+    $('#grid').innerHTML=`
+    <div class="slot"><div class="sh" style="background:#3ddc84"></div><div class="t">PlayStation 2 <small>ps2-0230a-20080220.bin · usa v2.30 · ok</small></div></div>
+    <div class="slot"><div class="sh" style="background:#3ddc84"></div><div class="t">PlayStation <small>scph1001.bin + 15 others · ok</small></div></div>
+    <div class="slot"><div class="sh" style="background:#3ddc84"></div><div class="t">Xbox <small>mcpx_1.0.bin, xbox-5713.bin, eeprom.bin, xbox_hdd.qcow2 · ok</small></div></div>
+    <div class="slot"><div class="sh" style="background:var(--accent2)"></div><div class="t">Xbox 360 <small>xbox360-bios-v10.bin present but xenia doesn't use a bios file. nothing to fix, just fyi.</small></div><div class="act" style="opacity:1"><button>open folder</button></div></div>`;
+    return;
+  }
+  const l=list();
+  $('#grid').style.display='grid';
+  $('#sub').textContent=`${l.length} games · ${filter=='all'?'4 emulators':SYS[filter]?SYS[filter].emu:''}`;
+  $('#grid').innerHTML=l.map(g=>`<div class="card ${sel==g.id?'sel':''}" data-id="${g.id}">${artEl(g)}<span class="tag">${g.sys.toUpperCase()}</span>${g.fav?'<span class="fav">★</span>':''}${g.pt!='—'?`<span class="pt">${g.pt}</span>`:''}</div>`).join('');
+  $('#grid').querySelectorAll('.card').forEach(c=>c.onclick=()=>{sel=+c.dataset.id;renderGrid();renderDetail();});
+}
+function renderDetail(){
+  const g=G.find(x=>x.id==sel); if(!g){$('#detail').innerHTML='<div class="empty">pick a game</div>';return;}
+  const s=SYS[g.sys], slots=SLOTS[g.id]||SLOTS.default;
+  $('#detail').innerHTML=`
+  <div class="hero">${g.art?`<img src="${ART+g.art}">`:''}<div class="cover">${artEl(g)}</div></div>
+  <div class="body">
+    <h3>${g.t}</h3>
+    <div class="meta"><span>${s.n}</span><span>${g.y}</span><span>${g.pt} played</span><span>last: ${g.last}</span>${g.discs?`<span>${g.discs} discs</span>`:''}</div>
+    <button class="btn primary" onclick="launch(${g.id})">▶ Play</button>
+    <div class="row"><button class="btn" onclick="toast('${g.fav?'removed from':'added to'} favorites')">★ ${g.fav?'Unfavorite':'Favorite'}</button><button class="btn">✎ Edit</button><button class="btn" onclick="toast('opening ${g.file}')">▣ Folder</button></div>
+    <div class="sect"><h5>Saves <a onclick="toast('snapshot taken: <b>slot ${slots.length}</b>')">+ snapshot now</a></h5>
+      ${slots.map(x=>`<div class="slot ${x.auto?'auto':''}"><div class="sh"></div><div class="t">${x.n}<small>${x.d}</small></div><div class="act"><button onclick="toast('restored <b>${x.n}</b>. previous state backed up first.')">restore</button><button>rename</button><button>⋯</button></div></div>`).join('')}
+    </div>
+    <div class="sect"><h5>Launch</h5>
+      <div class="kv">
+        <span>emulator</span><select><option>${s.emu} (system default)</option><option>RetroArch · ${g.sys} core</option><option>custom…</option></select>
+        <span>args</span><code>-fullscreen -batch "{rom}"</code>
+        <span>saves from</span><code>${g.sys=='xbox'?'xbox_hdd.qcow2 (snapshot)':g.sys=='gc'?'GC/USA/Card A':g.sys=='ps1'?'memcards/'+(g.serial||'…')+'.mcd':'memcards/'+g.t.slice(0,12)+'….ps2'}</code>
+        <span>rom</span><code style="opacity:.7">${g.file}</code>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---------- couch ---------- */
+function renderCouch(){
+  const cont=G.filter(g=>g.pt!='—').slice(0,5);
+  const rows=[{k:'continue',n:'Continue',items:cont,wide:1}];
+  for(const k in SYS){ const it=G.filter(g=>g.sys==k); if(it.length) rows.push({k,n:SYS[k].n,items:it}); }
+  couchList=[];
+  const wideArt=g=>g.art?`<img class="bd" src="${ART+g.art}"><img class="cv" src="${ART+g.art}">`:`<div class="noart">${g.t}<small>no art yet</small></div>`;
+  $('#couch').innerHTML=rows.map(r=>`<div class="crow"><h3><b>${r.n}</b> ${r.items.length}</h3><div class="strip">${r.items.map(g=>{couchList.push(g.id);return `<div class="tile ${r.wide?'wide':''}" data-id="${g.id}">${r.wide?wideArt(g):artEl(g)}${r.wide?`<div class="cap">${g.t}<small>${g.pt} · ${g.last}</small></div>`:''}</div>`;}).join('')}${r.k=='pc'?'<div class="tile add">+</div>':''}</div></div>`).join('');
+  $('#couch').querySelectorAll('.tile[data-id]').forEach((t,i)=>{t.onmouseenter=()=>setFocus(i);t.onclick=()=>openOv();});
+  setFocus(focus);
+}
+function setFocus(i){
+  const tiles=[...$('#couch').querySelectorAll('.tile[data-id]')]; if(!tiles.length)return;
+  focus=Math.max(0,Math.min(tiles.length-1,i));
+  tiles.forEach(t=>t.classList.remove('focus')); tiles[focus].classList.add('focus');
+  tiles[focus].scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'});
+  const row=tiles[focus].closest('.crow'), c=$('#couch'), r=row.getBoundingClientRect(), cr=c.getBoundingClientRect();
+  if(r.top<cr.top+70) c.scrollBy({top:r.top-cr.top-70,behavior:'smooth'});
+  else if(r.bottom>cr.bottom-60) c.scrollBy({top:r.bottom-cr.bottom+60,behavior:'smooth'});
+}
+function openOv(){
+  const g=G.find(x=>x.id==couchList[focus]); const slots=SLOTS[g.id]||SLOTS.default;
+  $('#ov').innerHTML=`<div class="box">${g.art?`<img class="big" src="${ART+g.art}">`:`<div class="noart">no art yet</div>`}
+   <div class="body"><h2>${g.t}</h2><div class="meta"><span>${SYS[g.sys].n}</span><span>${g.y}</span><span>${g.pt} played</span><span>${SYS[g.sys].emu}</span></div>
+   <div class="big-btns"><button class="btn primary f" style="width:auto" onclick="launch(${g.id})">▶ Play</button><button class="btn">★</button><button class="btn">saves</button><button class="btn">details</button></div>
+   <div class="sect"><h5>Saves</h5><div class="slots">${slots.map((x,i)=>`<div class="slot ${x.auto?'auto':''}"><div class="sh"></div><div class="t">${x.n}<small>${x.d}</small></div></div>`).join('')}</div></div>
+   <div class="desc">description comes from the scraper (igdb / screenscraper) on first scan. it's cached so the hub never waits on the internet after that.</div>
+   </div></div>`;
+  $('#ov').classList.add('open');
+}
+function launch(id){ const g=G.find(x=>x.id==id); $('#ov').classList.remove('open'); toast(`launching <b>${g.t}</b> with ${SYS[g.sys].emu}. auto save snapshot taken first. hub sleeps until it exits.`); }
+
+/* ---------- glue ---------- */
+function setMode(m){ body.dataset.mode=m; $('#modeSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.m==m)); if(m=='couch') renderCouch(); }
+$('#modeSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+document.querySelectorAll('.swatch').forEach(s=>s.onclick=()=>{body.dataset.theme=s.dataset.t;document.querySelectorAll('.swatch').forEach(x=>x.classList.toggle('on',x==s));});
+$('#q').oninput=()=>renderGrid();
+let tt; function toast(h){ const t=$('#toast'); t.innerHTML=h; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),2600); }
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName=='INPUT'){ if(e.key=='Escape') e.target.blur(); return; }
+  if(e.key=='/'){ e.preventDefault(); $('#q').focus(); return; }
+  if(e.key=='Tab'){ e.preventDefault(); setMode(body.dataset.mode=='couch'?'desktop':'couch'); return; }
+  if(body.dataset.mode!='couch') return;
+  if($('#ov').classList.contains('open')){ if(e.key=='Escape'||e.key=='Backspace') $('#ov').classList.remove('open'); if(e.key=='Enter') launch(couchList[focus]); return; }
+  const tiles=[...$('#couch').querySelectorAll('.tile[data-id]')];
+  const rowOf=i=>tiles[i].closest('.crow');
+  if(e.key=='ArrowRight') setFocus(focus+1);
+  if(e.key=='ArrowLeft') setFocus(focus-1);
+  if(e.key=='ArrowDown'){ const r=rowOf(focus); let i=focus; while(i<tiles.length-1 && rowOf(i)==r) i++; setFocus(i); }
+  if(e.key=='ArrowUp'){ const r=rowOf(focus); let i=focus; while(i>0 && rowOf(i)==r) i--; const r2=rowOf(i); while(i>0 && rowOf(i-1)==r2) i--; setFocus(i); }
+  if(e.key=='Enter') openOv();
+  if(e.key.toLowerCase()=='x'){ setFocus(Math.floor(Math.random()*tiles.length)); }
+});
+$('#ov').onclick=e=>{ if(e.target.id=='ov') $('#ov').classList.remove('open'); };
+['dragenter','dragover'].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault();body.classList.add('dragging');}));
+['dragleave','drop'].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault();if(ev=='drop'||e.relatedTarget==null)body.classList.remove('dragging');if(ev=='drop')toast('got it. looks like a <b>DuckStation</b> exe, ps1. want the default args?');}));
+setInterval(()=>$('#clock').textContent=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),1000);
+
+renderSide(); renderGrid(); sel=11; renderGrid(); renderDetail();
+const P=new URLSearchParams(location.search);
+if(P.get('theme')){ body.dataset.theme=P.get('theme'); document.querySelectorAll('.swatch').forEach(x=>x.classList.toggle('on',x.dataset.t==P.get('theme'))); }
+if(P.get('mode')=='couch'){ setMode('couch'); focus=+(P.get('focus')||7); setFocus(focus); if(P.get('ov')) openOv(); }
+</script>
+</body>
+</html>
