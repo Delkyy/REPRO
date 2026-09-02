@@ -324,7 +324,36 @@ function killRunning() {
   return { ok: true };
 }
 
-// ---------- window
+// ---------- controller Guide/Home button hook (xinput-ffi, no node-gyp)
+// XInputGetStateEx (ordinal 100) exposes the Guide button which standard XInputGetState hides.
+// Source: https://github.com/xan105/node-xinput-ffi
+let guidePoller = null;
+async function startGuideHook() {
+  let xif;
+  try { xif = await import('xinput-ffi'); } catch (e) { console.warn('xinput-ffi not available, Guide hook disabled:', e.message); return; }
+  const { getStateEx, listConnected } = xif;
+  const GUIDE = 0x0400;
+  const prev = [false, false, false, false];
+  guidePoller = setInterval(async () => {
+    try {
+      const connected = await listConnected();
+      for (let i = 0; i < 4; i++) {
+        if (!connected[i]) { prev[i] = false; continue; }
+        const s = await getStateEx({ dwUserIndex: i, translate: false });
+        const down = (s.gamepad.wButtons & GUIDE) !== 0;
+        if (down && !prev[i]) onGuidePress();
+        prev[i] = down;
+      }
+    } catch {}
+  }, 50); // 20hz — low enough not to burn CPU, responsive enough for a UI button
+}
+function stopGuideHook() { if (guidePoller) { clearInterval(guidePoller); guidePoller = null; } }
+function onGuidePress() {
+  if (!running) { win?.show(); win?.focus(); return; }
+  killRunning();
+  send('menu', 'toast', 'closed the game via Guide button');
+}
+
 let win;
 const send = (ch, ...a) => win?.webContents.send(ch, ...a);
 function buildMenu() {
@@ -394,9 +423,9 @@ function registerHubKey() {
   buildMenu();
   return hubKeyOk;
 }
-app.whenReady().then(() => { if (!process.argv.includes('--smoke')) createWindow(); });
+app.whenReady().then(() => { if (!process.argv.includes('--smoke')) createWindow(); startGuideHook(); });
 app.on('window-all-closed', () => app.quit());
-app.on('will-quit', () => globalShortcut.unregisterAll());
+app.on('will-quit', () => { globalShortcut.unregisterAll(); stopGuideHook(); });
 module.exports = { detectEmulators, scanLibrary, snapshot, config, saveConfig, recipes, resolveDataDir, ROOT };
 
 // ---------- ipc

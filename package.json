@@ -37,7 +37,12 @@
     "win": {
       "icon": "assets/brand/icon.ico",
       "target": [
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     },
     "portable": {
@@ -54,6 +59,10 @@
   },
   "allowScripts": {
     "electron@44.1.1": true,
-    "electron-winstaller@5.4.0": true
+    "electron-winstaller@5.4.0": true,
+    "koffi@2.16.3": true
+  },
+  "dependencies": {
+    "xinput-ffi": "^4.0.2"
   }
 }
