@@ -57,8 +57,8 @@ All four are dark-first, none are navy+red or purple-gradient. All `fg`-on-`bg` 
 | accent | `#FF2D6F` hot pink | 5.45 : 1 (AA large; use for focus rings/badges, white text on it) |
 | accent2 (opt) | `#00E5FF` cyan | 12.71 : 1 |
 
-- **Headline:** Unbounded (Bold/Black) — https://fonts.google.com/specimen/Unbounded — OFL (https://github.com/google/fonts/issues/5205)
-- **Body:** Sora (Regular/SemiBold) — https://fonts.google.com/specimen/Sora — OFL 1.1 (https://github.com/sora-xor/sora-font)
+- **Headline:** Space Grotesk (Bold 700) — https://fonts.google.com/specimen/Space+Grotesk — OFL. *(was Unbounded; swapped 2026-09-02 after an in-app comparison of 8 pairings, sketches/type-sheet.png — Unbounded wrapped titles and shouted.)*
+- **Body:** Inter (Regular/SemiBold) — https://fonts.google.com/specimen/Inter — OFL. *(was Sora.)*
 - **Reference:** Analogue Pocket / Aluminum Editions pages — https://www.analogue.co/pocket , https://www.analogue.co/editions/pocket-aluminum
 - **Why:** True neutrals let each system's own accent color (list below) carry the color, so the library grid becomes a rainbow of consoles on a black shelf — the most "customizable" of the four. Unbounded's wide, chunky caps make REPRO look like something laser-etched on a faceplate, which is the "better than Playnite" premium cue.
 

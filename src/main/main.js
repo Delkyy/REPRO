@@ -87,6 +87,109 @@ async function detectEmulators(extraDirs = []) {
   return hits;
 }
 
+// ---------- drive discovery (Windows: wmic logicaldisk)
+async function getLocalDrives() {
+  return new Promise(resolve => {
+    const { exec } = require('child_process');
+    exec('wmic logicaldisk get deviceid,drivetype', (err, out) => {
+      if (err) { resolve(['C:\\']); return; }
+      const drives = [];
+      for (const line of out.split('\n')) {
+        const m = line.match(/^([A-Z]:)\s+(\d)/);
+        if (m && (m[2] === '3' || m[2] === '2')) drives.push(m[1] + '\\'); // local + removable
+      }
+      resolve(drives.length ? drives : ['C:\\']);
+    });
+  });
+}
+
+// ---------- deep rom scan: walks all drives for known rom extensions
+// onProgress(found, scanned, currentPath) — called roughly every 500 files
+const SKIP_DIRS = new Set(['Windows','$RECYCLE.BIN','System Volume Information','Program Files','Program Files (x86)',
+  'ProgramData','node_modules','AppData','$Windows.~BT','$Windows.~WS','Boot','Recovery','Config.Msi']);
+const ROM_EXTS = new Set(Object.keys(ALL_EXT)); // built from recipes + systems.json
+
+async function deepScanDrive(drive, foundRoms, onProgress) {
+  let scanned = 0;
+  async function walkDeep(dir) {
+    let ents;
+    try { ents = await fsp.readdir(dir, { withFileTypes: true }); } catch { return; }
+    // skip emulator program folders
+    if (ents.some(e => e.isFile() && /\.exe$/i.test(e.name) && recipeForExe(e.name))) return;
+    for (const e of ents) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        if (SKIP_DIRS.has(e.name) || e.name.startsWith('.')) continue;
+        await walkDeep(p);
+      } else if (e.isFile()) {
+        scanned++;
+        const ext = path.extname(e.name).toLowerCase();
+        if (ROM_EXTS.has(ext)) {
+          foundRoms.push(p);
+          if (onProgress && scanned % 500 === 0) onProgress(foundRoms.length, scanned, p);
+        }
+      }
+    }
+  }
+  await walkDeep(drive);
+}
+
+// Group found roms into folder buckets, add any new ones as romDirs
+async function autoScanRoms(onProgress) {
+  const drives = await getLocalDrives();
+  const foundRoms = [];
+  for (const drive of drives) {
+    if (onProgress) onProgress(foundRoms.length, 0, `scanning ${drive}…`);
+    await deepScanDrive(drive, foundRoms, onProgress);
+  }
+  // group by parent folder
+  const dirs = {};
+  for (const p of foundRoms) { const d = path.dirname(p); dirs[d] = (dirs[d] || 0) + 1; }
+  // add folders not already in romDirs (min 1 rom file)
+  let added = 0;
+  for (const [d, count] of Object.entries(dirs)) {
+    if (count >= 1 && !config.romDirs.some(r => r.path === d || d.startsWith(r.path))) {
+      config.romDirs.push({ path: d, system: null });
+      added++;
+    }
+  }
+  if (added) saveConfig();
+  return { drives: drives.length, romsFound: foundRoms.length, foldersAdded: added };
+}
+
+// ---------- smart path recovery: if a game's file no longer exists, find it by filename
+async function recoverMissingPaths(onProgress) {
+  const missing = Object.values(library.games).filter(g => !fs.existsSync(g.path));
+  if (!missing.length) return { recovered: 0, stillMissing: 0 };
+  const drives = await getLocalDrives();
+  // build filename -> path index from a fresh deep scan
+  const index = {}; // filename.lower -> full path
+  let scanned = 0;
+  for (const drive of drives) {
+    async function indexWalk(dir) {
+      let ents; try { ents = await fsp.readdir(dir, { withFileTypes: true }); } catch { return; }
+      for (const e of ents) {
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) { if (!SKIP_DIRS.has(e.name) && !e.name.startsWith('.')) await indexWalk(p); }
+        else { scanned++; index[e.name.toLowerCase()] = p; if (onProgress && scanned % 1000 === 0) onProgress(scanned, p); }
+      }
+    }
+    await indexWalk(drive);
+  }
+  let recovered = 0;
+  for (const g of missing) {
+    const fn = path.basename(g.path).toLowerCase();
+    if (index[fn]) {
+      const oldPath = g.path;
+      library.games[index[fn]] = { ...g, path: index[fn], id: index[fn] };
+      delete library.games[oldPath];
+      recovered++;
+    }
+  }
+  if (recovered) saveLibrary();
+  return { recovered, stillMissing: missing.length - recovered };
+}
+
 // ---------- scan roms
 const ALL_EXT = {}; // ext -> [system]
 // these are launchable but a scan should never pick them up (every emulator ships .exe/.bin/.elf files)
@@ -139,6 +242,8 @@ async function scanDir(dir, out, unsorted, forcedSys) {
   }
 }
 async function scanLibrary() {
+  // first: try to recover any games whose paths no longer exist
+  await recoverMissingPaths().catch(() => {});
   const found = [], unsorted = [];
   for (const rd of config.romDirs) await scanDir(rd.path, found, unsorted, rd.system || null);
   // merge: keep playtime etc for games we already knew
@@ -419,6 +524,7 @@ function buildMenu() {
       { label: 'Add emulator…', click: () => send('menu', 'addExe') },
       { label: 'Rescan library', accelerator: 'F5', click: () => send('menu', 'rescan') },
       { label: 'Find duplicates…', click: () => send('menu', 'duplicates') },
+      { label: 'Scan whole PC for roms…', click: () => send('menu', 'autoScan') },
       { type: 'separator' },
       { label: 'Open REPRO folder', click: () => shell.openPath(ROOT) },
       { label: 'Open config.json', click: () => shell.openPath(P.config) },
@@ -581,3 +687,25 @@ ipcMain.handle('scrapeOne', async (_, gameId) => {
 ipcMain.handle('setIgdb', (_, { clientId, clientSecret }) => { config.igdb = { clientId, clientSecret }; saveConfig(); return { ok: true }; });
 ipcMain.handle('generateM3u', () => { const n = generateM3u(); return { created: n }; });
 ipcMain.handle('scrapeStatus', () => ({ active: scrapeActive, hasCredentials: !!(config.igdb?.clientId) }));
+
+// ---------- auto-scan / path recovery IPC
+let deepScanActive = false;
+ipcMain.handle('autoScanRoms', async () => {
+  if (deepScanActive) return { error: 'scan already running' };
+  deepScanActive = true;
+  try {
+    const result = await autoScanRoms((found, scanned, cur) => {
+      send('scan-progress', { found, scanned, cur: path.basename(cur) });
+    });
+    if (result.foldersAdded > 0) {
+      const scan = await scanLibrary();
+      return { ...result, games: scan.games.length };
+    }
+    return result;
+  } finally { deepScanActive = false; }
+});
+ipcMain.handle('recoverPaths', async () => {
+  const r = await recoverMissingPaths();
+  if (r.recovered) await scanLibrary();
+  return r;
+});

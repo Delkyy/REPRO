@@ -105,9 +105,9 @@ function renderEmpty() {
   const emu = s ? emuFor(filter) : null;
   const msg = emu?.exe ? `REPRO found ${esc(emu.name)} but nothing to run on it.<br>point it at a folder, or make one in the REPRO folder and drop roms in.`
     : s ? `no emulator set up for this system yet.<br>add one, or drop roms in anyway for when you do.`
-    : `nothing here yet. hit <b>+</b> up top and point REPRO at a rom folder.`;
+    : `point REPRO at a folder of roms and it'll sort them by system.<br>you can also drop a folder anywhere on this window.`;
   $('#count').textContent = `0 / ${S.games.length}`;
-  $('#main').innerHTML = `<div class="empty"><div class="box"><h3>no ${s ? esc(sysName(filter)) + ' ' : ''}games yet</h3><p>${msg}</p><div class="btns">
+  $('#main').innerHTML = `<div class="empty"><div class="box" ${s ? sysc(filter) : ''}><i class="mark ${s ? 'sys' : ''}" style="--m:url('${fileUrl(ROOT + (s ? '/assets/systems/' + filter : '/assets/brand/repro-mark') + '.svg')}')"></i><h3>no ${s ? esc(sysName(filter)) + ' ' : ''}games yet</h3><p>${msg}</p><div class="btns">
     ${emu?.exe ? `<button class="p" id="eAddFolder">add rom folder…</button>` : s ? `<button class="p" id="eAddEmu">add emulator…</button>` : `<button class="p" id="eAddFolder">add rom folder…</button>`}
     ${s ? `<button id="eCreate">create roms/${filter}/</button>` : ''}<button id="eWhat">what files work?</button></div></div></div>`;
   const af = $('#eAddFolder'); if (af) af.onclick = () => $('#railAdd').click();
@@ -119,7 +119,7 @@ function recipeSysExt(sys) { return S.sysdb[sys]?.ext || []; }
 function renderUnsorted() {
   $('#count').textContent = `${S.unsorted.length} unsorted`;
   $('#main').innerHTML = `<h2>Unsorted</h2><div class="sub">${S.unsorted.length ? 'found these but could not place them' : 'nothing here, everything scanned has a home'}</div>
-    <div id="items">${S.unsorted.map(u => `<div class="slot"><div class="sh" style="background:var(--bg)"></div><div class="t">${esc(u.path.split(/[\\/]/).pop())}<small>${esc(u.why)} · ${esc(u.path)}</small></div><div class="act" style="opacity:1"><button data-open="${esc(u.path)}">show in folder</button></div></div>`).join('')}</div>`;
+    <div id="items">${S.unsorted.map(u => `<div class="slot"><div class="sh glyph">?</div><div class="t">${esc(u.path.split(/[\\/]/).pop())}<small>${esc(u.why)} · ${esc(u.path)}</small></div><div class="act" style="opacity:1"><button data-open="${esc(u.path)}">show in folder</button></div></div>`).join('')}</div>`;
   $('#main').querySelectorAll('[data-open]').forEach(b => b.onclick = () => repro.showInFolder(b.dataset.open));
 }
 function renderEmu(id) {
@@ -129,8 +129,8 @@ function renderEmu(id) {
     <div id="items">
     <div class="btnrow" style="margin:0 0 18px"><button class="p" id="eLaunch" style="flex:none;padding:9px 16px;background:var(--accent);color:#fff;border:0">▶ Open ${esc(e.name)}</button><button id="eChange" style="flex:none">change exe…</button></div>
     <div class="pane" style="padding:0"><h5>Files</h5>
-    ${(e.folders || []).map(f => `<div class="slot"><div class="sh" style="background:var(--bg)"></div><div class="t"><b>${esc(f.label)}</b><small>${esc(f.path)}</small></div><div class="act" style="opacity:1"><button data-open="${esc(f.path)}">open folder</button></div></div>`).join('')}
-    <div class="slot"><div class="sh" style="background:var(--bg)"></div><div class="t"><b>exe</b><small>${esc(e.exe)}</small></div><div class="act" style="opacity:1"><button data-show="${esc(e.exe)}">show in folder</button></div></div>
+    ${(e.folders || []).map(f => `<div class="slot"><div class="sh glyph">▣</div><div class="t"><b>${esc(f.label)}</b><small>${esc(f.path)}</small></div><div class="act" style="opacity:1"><button data-open="${esc(f.path)}">open folder</button></div></div>`).join('')}
+    <div class="slot"><div class="sh glyph">▶</div><div class="t"><b>exe</b><small>${esc(e.exe)}</small></div><div class="act" style="opacity:1"><button data-show="${esc(e.exe)}">show in folder</button></div></div>
     <h5>Launch args (recipes/${id}.json)</h5><div class="kv">${(e.systems || []).map(k => `<span>${esc(sysName(k))}</span><code>${esc((S.recipeArgs?.[id]?.[k] || ['{rom}']).join(' '))}</code>`).join('')}</div>
     </div></div>`;
   $('#eLaunch').onclick = () => repro.launchEmu(id);
@@ -159,7 +159,7 @@ function renderDetail() {
    <div class="banner" ${sysc(g.sys)}>${g.art ? `<div class="bd" style="background-image:url('${fileUrl(g.art)}')"></div>` : ''}${logo(g.sys)}<button class="icon cog" id="dCog">⚙</button></div>
    <div class="head"><div class="cover">${g.art ? `<img src="${fileUrl(g.art)}">` : ''}</div><h3>${esc(g.title)}</h3></div>
    <div class="playbar"><button class="play" id="dPlay" ${ok ? '' : 'disabled'}>▶ Play${ok ? '' : ' (no emulator)'}</button>
-     <div class="st"><span>last played</span><b>${fmtLast(g.lastPlayed)}</b></div><div class="st"><span>playtime</span><b>${fmtPt(g.playtime)}</b></div></div>
+     <div class="st"><span>last played</span><b>${fmtLast(g.lastPlayed)}</b></div><div class="st"><span>playtime</span><b>${g.playtime ? fmtPt(g.playtime) : 'not yet'}</b></div></div>
    <div class="links"><button id="dFav">★ ${g.fav ? 'unfavorite' : 'favorite'}</button><button id="dFolder">▣ folder</button><button id="dTabSaves">⛁ saves</button><button id="dTabLaunch2">⛭ launch</button></div>
    <div class="tabs">${['saves', 'launch', 'info'].map(t => `<button class="${tab == t ? 'on' : ''}" data-t="${t}">${t}${t == 'launch' && g.emulator ? '<span class="n" style="color:var(--accent2)">alt</span>' : ''}</button>`).join('')}</div>
    <div class="pane">${panes[tab]}</div>`;
@@ -309,10 +309,14 @@ async function openSettings() {
   const emus = { ...S.emulators };
   for (const f of found) if (!emus[f.recipe]?.exe) emus[f.recipe] = { exe: f.exe, name: f.name, detected: true };
   const emuRows = Object.entries(emus).map(([id, e]) => `<div class="slot"><div class="sh emu" style="--st:${e.exe ? '#3ddc84' : 'var(--accent2)'}">${logo(id)}</div><div class="t"><b>${esc(e.name || id)}</b>${e.detected && !S.emulators[id]?.exe ? ' <small style="color:var(--accent2)">found, not added</small>' : ''}<small>${esc(e.exe || 'not set')}</small></div><div class="act" style="opacity:1"><button data-exe="${id}" data-found="${esc(e.exe || '')}">${e.detected && !S.emulators[id]?.exe ? 'add' : 'change…'}</button></div></div>`).join('');
-  const dirRows = (S.config.romDirs || []).map(r => `<div class="slot"><div class="sh" style="background:var(--bg)"></div><div class="t">${esc(r.path)}<small>${r.system ? 'forced: ' + esc(sysName(r.system)) : 'system guessed per file'}</small></div><div class="act" style="opacity:1"><button data-rm="${esc(r.path)}">remove</button></div></div>`).join('');
+  const dirRows = (S.config.romDirs || []).map(r => `<div class="slot"><div class="sh glyph">▣</div><div class="t">${esc(r.path)}<small>${r.system ? 'forced: ' + esc(sysName(r.system)) : 'system guessed per file'}</small></div><div class="act" style="opacity:1"><button data-rm="${esc(r.path)}">remove</button></div></div>`).join('');
   $('#modal').innerHTML = `<div class="box"><div class="mh"><h3>Settings</h3><button class="icon" id="mClose">✕</button></div><div class="mb">
     <h5>Emulators</h5>${emuRows || '<div class="hint">none found.</div>'}<button class="btnrow" id="mAddExe" style="margin-top:8px;display:block;padding:7px 12px;border:1px solid var(--line);border-radius:6px">add exe…</button>
-    <h5 style="margin-top:16px">Rom folders</h5>${dirRows || '<div class="hint">none yet.</div>'}<button id="mAddDir" style="margin-top:8px;display:block;padding:7px 12px;border:1px solid var(--line);border-radius:6px">+ add folder…</button>
+    <h5 style="margin-top:16px">Rom folders</h5>${dirRows || '<div class="hint">none yet.</div>'}<div class="btnrow" style="margin-top:8px">
+    <button id="mAddDir" style="padding:7px 12px;border:1px solid var(--line);border-radius:6px">+ add folder…</button>
+    <button id="mAutoScan" style="padding:7px 12px;border:1px solid var(--accent2);color:var(--accent2);border-radius:6px;font-weight:700">🔍 scan whole PC for roms</button>
+    </div>
+    <div id="autoScanLog" style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:6px;min-height:16px"></div>
     <h5 style="margin-top:16px">Config</h5><div class="hint">everything lives next to the app: ${esc(ROOT)}</div>
     <h5 style="margin-top:16px">Hub key</h5><div class="hint">press <code style="background:var(--panel);padding:2px 6px;border-radius:4px">${esc(S.config.hubKey || 'Ctrl+Alt+H')}</code>${S.config.hubKeyOk === false ? ' <b style="color:var(--accent2)">— not registered, another app has this combo</b>' : ''} anywhere, even with the emulator focused, to close the running game and jump back to REPRO. map a controller's Guide/Home button to it in Windows or Steam Input for a one-button "back to hub". <button id="mHubKey" style="margin-top:6px;display:block;padding:6px 10px;border:1px solid var(--line);border-radius:6px">change…</button></div>
     <h5 style="margin-top:16px">Art &amp; metadata scraper</h5><div class="hint">
@@ -332,6 +336,15 @@ async function openSettings() {
   $('#mClose').onclick = () => $('#modal').classList.remove('open');
   $('#modal').querySelectorAll('[data-exe]').forEach(b => b.onclick = async () => { const found2 = b.dataset.found; const p = found2 || await repro.pickExe(); if (p) { S = await repro.setEmulator({ id: b.dataset.exe, exe: p }); openSettings(); } });
   $('#mAddExe').onclick = addExe;
+  const mas = $('#mAutoScan'); if (mas) mas.onclick = async () => {
+    const log = $('#autoScanLog'); mas.disabled = true; mas.textContent = 'scanning…';
+    repro.onScanProgress(d => { if (log) log.textContent = `${d.cur} (${d.found} roms found)`; });
+    const r = await repro.autoScanRoms();
+    if (log) log.innerHTML = r.error ? `<b style="color:var(--accent)">${esc(r.error)}</b>`
+      : `done: ${r.romsFound} roms across ${r.drives} drives, ${r.foldersAdded} new folder${r.foldersAdded!==1?'s':''} added${r.games?`, library now has ${r.games} games`:''}`;
+    S = await repro.snapshot(); renderAll(); mas.disabled = false; mas.textContent = '🔍 scan whole PC for roms';
+    openSettings();
+  };
   const mhk = $('#mHubKey'); if (mhk) mhk.onclick = async () => { await changeHubKey(); openSettings(); };
   const msa = $('#mScrapeAll'); if (msa) msa.onclick = async () => {
     const id = $('#igdbId')?.value.trim(); const sec = $('#igdbSec')?.value.trim();
@@ -375,6 +388,7 @@ $('#cov').onclick = e => { if (e.target.id == 'cov') $('#cov').classList.remove(
 $('#modal').onclick = e => { if (e.target.id == 'modal') { modalGen++; $('#modal').classList.remove('open'); } };
 repro.onMenu((cmd, arg) => {
   ({ addRomDir: () => $('#railAdd').click(), addExe, rescan: () => refresh(true), setup: openSettings, duplicates: openDuplicates,
+     autoScan: () => { openSettings(); setTimeout(() => $('#mAutoScan')?.click(), 400); },
      search: () => { $('#q').focus(); }, mode: () => setMode(arg), theme: () => setTheme(arg), ui: () => setUI(arg),
      toast: () => toast(arg), hubkey: changeHubKey })[cmd]?.();
 });
@@ -614,7 +628,13 @@ function guideSectionNav(dir) {
 }
 
 function renderAll() { renderSide(); renderMain(); renderDetail(); if (app.classList.contains('couch')) renderCouch(); }
-async function refresh(showToast) { S = await repro.scan(); if (showToast) toast(`rescanned: ${S.games.length} games`); renderAll(); }
+async function refresh(showToast) {
+  const rec = await repro.recoverPaths().catch(()=>({recovered:0}));
+  if (rec.recovered) toast(`recovered ${rec.recovered} moved game${rec.recovered!==1?'s':''}`);
+  S = await repro.scan();
+  if (showToast) toast(`rescanned: ${S.games.length} games`);
+  renderAll();
+}
 (async () => {
   ROOT = await repro.root();
   $('#brandLg').style.setProperty('--m', `url('${fileUrl(ROOT + '/assets/brand/repro-mark.svg')}')`);
