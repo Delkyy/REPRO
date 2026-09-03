@@ -1,7 +1,7 @@
 // REPRO renderer. talks to main via window.repro (see preload.js). layout ported from sketches/002-desktop.
 const $ = s => document.querySelector(s), app = $('#app');
 let S = { games: [], unsorted: [], emulators: {}, systems: {}, sysdb: {}, config: {} };
-let filter = 'all', sel = null, view = 'grid', ROOT = '';
+let filter = 'all', sel = null, view = 'grid', ROOT = '', BUNDLE = '';
 let cFocus = 0, cList = [], cRows = [];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fileUrl = p => 'file:///' + p.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/');
@@ -11,7 +11,7 @@ const sysName = k => S.systems[k] || k;
 const sysColor = k => S.sysdb?.[k]?.color || null;
 const sysc = k => sysColor(k) ? `style="--sysc:${sysColor(k)}"` : '';
 const sysStyle = k => sysColor(k) ? `--sysc:${sysColor(k)}` : '';
-const logo = k => `<i class="lg" style="--m:url('${fileUrl(ROOT + '/assets/systems/' + k + '.svg')}')"></i>`;
+const logo = k => `<i class="lg" style="--m:url('${fileUrl(BUNDLE + '/assets/systems/' + k + '.svg')}')"></i>`;
 const emuFor = k => Object.entries(S.emulators).find(([id, e]) => e.systems?.includes(k))?.[1];
 const emuName = k => emuFor(k)?.name || 'no emulator';
 const hasEmu = k => !!emuFor(k)?.exe;
@@ -107,7 +107,7 @@ function renderEmpty() {
     : s ? `no emulator set up for this system yet.<br>add one, or drop roms in anyway for when you do.`
     : `point REPRO at a folder of roms and it'll sort them by system.<br>you can also drop a folder anywhere on this window.`;
   $('#count').textContent = `0 / ${S.games.length}`;
-  $('#main').innerHTML = `<div class="empty"><div class="box" ${s ? sysc(filter) : ''}><i class="mark ${s ? 'sys' : ''}" style="--m:url('${fileUrl(ROOT + (s ? '/assets/systems/' + filter : '/assets/brand/repro-mark') + '.svg')}')"></i><h3>no ${s ? esc(sysName(filter)) + ' ' : ''}games yet</h3><p>${msg}</p><div class="btns">
+  $('#main').innerHTML = `<div class="empty"><div class="box" ${s ? sysc(filter) : ''}><i class="mark ${s ? 'sys' : ''}" style="--m:url('${fileUrl(BUNDLE + (s ? '/assets/systems/' + filter : '/assets/brand/repro-mark') + '.svg')}')"></i><h3>no ${s ? esc(sysName(filter)) + ' ' : ''}games yet</h3><p>${msg}</p><div class="btns">
     ${emu?.exe ? `<button class="p" id="eAddFolder">add rom folder…</button>` : s ? `<button class="p" id="eAddEmu">add emulator…</button>` : `<button class="p" id="eAddFolder">add rom folder…</button>`}
     ${s ? `<button id="eCreate">create roms/${filter}/</button>` : ''}<button id="eWhat">what files work?</button></div></div></div>`;
   const af = $('#eAddFolder'); if (af) af.onclick = () => $('#railAdd').click();
@@ -293,7 +293,14 @@ function cKey(key) {
 
 /* ---------- mode / panels / theme ---------- */
 function setMode(m) { app.classList.toggle('couch', m == 'couch'); repro.setPref({ mode: m }); if (m == 'couch') renderCouch(); }
-function setTheme(t) { app.dataset.theme = t; $('#themeCss').href = `../../themes/${t}/theme.css`; repro.setPref({ theme: t }); }
+function setTheme(t) {
+  app.dataset.theme = t;
+  // find the theme's base path from the themes list (handles both asar and user themes)
+  const themeEntry = (S.themes || []).find(x => x.id === t);
+  const base = themeEntry?.base || BUNDLE || ROOT;
+  $('#themeCss').href = fileUrl(base + '/themes/' + t + '/theme.css');
+  repro.setPref({ theme: t });
+}
 function setUI(u) { document.documentElement.style.setProperty('--u', u == 'tv' ? 1.5 : 1); repro.setPref({ ui: u }); }
 function setPanel(which, on) { app.classList.toggle(which == 'side' ? 'noside' : 'nodetail', !on); const p = { ...(S.config.panels || {}) }; p[which] = on; repro.setPref({ panels: p }); }
 
@@ -637,7 +644,8 @@ async function refresh(showToast) {
 }
 (async () => {
   ROOT = await repro.root();
-  $('#brandLg').style.setProperty('--m', `url('${fileUrl(ROOT + '/assets/brand/repro-mark.svg')}')`);
+  BUNDLE = await repro.bundle();
+  $('#brandLg').style.setProperty('--m', `url('${fileUrl(BUNDLE + '/assets/brand/repro-mark.svg')}')`);
   S = await repro.snapshot();
   const c = S.config || {};
   setTheme(c.theme || 'billet'); setUI(c.ui || 'desk');

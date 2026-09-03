@@ -7,18 +7,28 @@ const os = require('os');
 const { spawn } = require('child_process');
 const { scrapeLibrary, scrapeGame } = require('./scraper');
 
-// ---------- portable root: everything lives next to the exe (or the repo when running from source)
-const ROOT = app.isPackaged ? path.dirname(process.execPath) : path.join(__dirname, '..', '..');
-const P = {
-  config: path.join(ROOT, 'config.json'),
-  library: path.join(ROOT, 'library.json'),
-  recipes: path.join(ROOT, 'recipes'),
-  themes: path.join(ROOT, 'themes'),
-  art: path.join(ROOT, 'art'),
-};
-for (const d of [P.art, P.themes]) fs.mkdirSync(d, { recursive: true });
+// ---------- two roots: BUNDLE (packed read-only assets) and ROOT (user data next to the exe)
+// In dev both are the repo root. In the packaged portable exe they split:
+//   BUNDLE = the asar (electron reads it transparently as a normal folder)
+//   ROOT   = PORTABLE_EXECUTABLE_DIR — the folder the user put the .exe in
+const BUNDLE = app.isPackaged ? app.getAppPath() : path.join(__dirname, '..', '..');
+const ROOT   = app.isPackaged
+  ? (process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(process.execPath))
+  : path.join(__dirname, '..', '..');
 
-const SYSDB = JSON.parse(fs.readFileSync(path.join(ROOT, 'systems.json'), 'utf8'));
+const P = {
+  config:  path.join(ROOT,   'config.json'),
+  library: path.join(ROOT,   'library.json'),
+  recipes: path.join(BUNDLE, 'recipes'),   // read-only, packed in asar
+  themes:  path.join(BUNDLE, 'themes'),    // built-in themes; user themes go in ROOT/themes
+  art:     path.join(ROOT,   'art'),
+};
+// ensure user-writable dirs exist on disk (can't mkdirSync inside asar)
+for (const d of [P.art, path.join(ROOT, 'themes'), path.join(ROOT, 'saves')]) {
+  try { fs.mkdirSync(d, { recursive: true }); } catch {}
+}
+
+const SYSDB = JSON.parse(fs.readFileSync(path.join(BUNDLE, 'systems.json'), 'utf8'));
 const SYSTEMS = Object.fromEntries(Object.entries(SYSDB).map(([k, v]) => [k, v.name]));
 
 const readJson = (p, fallback) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return fallback; } };
@@ -279,7 +289,9 @@ function emuFolders(id, e) {
 function snapshot() {
   const emus = {};
   for (const [id, e] of Object.entries(config.emulators)) emus[id] = { ...e, name: recipes[id]?.name || id, systems: recipes[id]?.systems || [], exeDir: e.exe ? path.dirname(e.exe) : null, folders: emuFolders(id, e) };
-  return { games: Object.values(library.games), unsorted: library.unsorted || [], emulators: emus, systems: SYSTEMS, sysdb: SYSDB, root: ROOT, recipeArgs: Object.fromEntries(Object.entries(recipes).map(([k, r]) => [k, r.args])), config: { mode: config.mode, ui: config.ui, theme: config.theme, romDirs: config.romDirs, views: config.views || [], panels: config.panels || { side: true, detail: true }, cardSize: config.cardSize || 150, hubKey: config.hubKey || 'Ctrl+Alt+H', hubKeyOk: hubKeyOk } };
+  function readThemeDir(base) { try { return fs.readdirSync(base).filter(d => fs.existsSync(path.join(base, d, 'theme.json'))).map(d => ({ id: d, ...readJson(path.join(base, d, 'theme.json'), {}), base })); } catch { return []; } }
+  const themes = [...readThemeDir(P.themes), ...(ROOT !== BUNDLE ? readThemeDir(path.join(ROOT, 'themes')) : [])].reduce((a, t) => { a[t.id] = t; return a; }, {});
+  return { games: Object.values(library.games), unsorted: library.unsorted || [], emulators: emus, systems: SYSTEMS, sysdb: SYSDB, root: ROOT, bundle: BUNDLE, themes: Object.values(themes), recipeArgs: Object.fromEntries(Object.entries(recipes).map(([k, r]) => [k, r.args])), config: { mode: config.mode, ui: config.ui, theme: config.theme, romDirs: config.romDirs, views: config.views || [], panels: config.panels || { side: true, detail: true }, cardSize: config.cardSize || 150, hubKey: config.hubKey || 'Ctrl+Alt+H', hubKeyOk: hubKeyOk } };
 }
 // duplicates: same title across different systems isn't a dupe, but same title+sys with a different path is
 function findDuplicates() {
@@ -606,7 +618,19 @@ ipcMain.handle('pickExe', async () => { const r = await dialog.showOpenDialog(wi
 ipcMain.handle('showInFolder', (_, p) => shell.showItemInFolder(p));
 ipcMain.handle('fullscreen', (_, on) => win.setFullScreen(on));
 ipcMain.handle('root', () => ROOT);
-ipcMain.handle('themes', () => fs.readdirSync(P.themes).filter(d => fs.existsSync(path.join(P.themes, d, 'theme.json'))).map(d => ({ id: d, ...readJson(path.join(P.themes, d, 'theme.json'), {}) })));
+ipcMain.handle('bundle', () => BUNDLE);
+ipcMain.handle('themes', () => {
+  // built-in themes (asar) + user themes (next to exe) merged; user themes override built-in
+  function readThemeDir(base) {
+    try { return fs.readdirSync(base).filter(d => fs.existsSync(path.join(base, d, 'theme.json'))).map(d => ({ id: d, ...readJson(path.join(base, d, 'theme.json'), {}), base })); } catch { return []; }
+  }
+  const builtin = readThemeDir(P.themes);
+  const userDir = path.join(ROOT, 'themes');
+  const user = ROOT !== BUNDLE ? readThemeDir(userDir) : [];
+  const merged = [...builtin];
+  for (const t of user) { const i = merged.findIndex(x => x.id === t.id); if (i >= 0) merged[i] = t; else merged.push(t); }
+  return merged;
+});
 ipcMain.handle('detectOne', (_, exe) => { const r = recipeForExe(exe); return r ? { recipe: r.id, name: r.name, exe } : null; });
 ipcMain.handle('duplicates', () => findDuplicates());
 ipcMain.handle('saveView', (_, view) => { config.views = config.views || []; const i = config.views.findIndex(v => v.id === view.id); if (i >= 0) config.views[i] = view; else config.views.push(view); saveConfig(); return snapshot(); });
