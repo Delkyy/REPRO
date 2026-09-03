@@ -1,0 +1,31 @@
+/* Channel — the light theme. white/sky-blue "channel grid" register (Wii Menu, daylight dashboards), proving REPRO's
+   theme system actually reskins the app rather than swapping one dark palette for another.
+   contrast checked with the real WCAG relative-luminance formula, not eyeballed:
+     fg/bg 17.05:1 (AAA)  muted/bg 6.27:1 (AA)  accent/bg 4.72:1 (AA)  white-on-accent 5.12:1 (AA)
+     accent2/bg 4.04:1 (AA large)  white-on-accent2 4.39:1 (AA large) — accent2 is for icons/badges/borders, not small text. */
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@600;700&family=Inter:wght@400;500;600;700&display=swap');
+:root {
+  --bg:#F3F6F9; --bg2:#FFFFFF; --panel:#FFFFFF; --panel2:#E7EEF4; --line:#D7DEE6;
+  --fg:#101418; --muted:#525C68; --accent:#0072B8; --accent2:#0C8A57;
+  --radius:10px; --display:"Quicksand",sans-serif; --font:"Inter",system-ui,sans-serif; --mono:"JetBrains Mono",monospace;
+}
+/* app.css leans on shadows for depth (card lift, modal, toast) that read fine on black but vanish on white — give
+   surfaces an actual edge here instead of a shadow no one can see. keeps every component file untouched. */
+.card, .ctile, .lrow, .slot, .search, .seg, .icon { border-color: var(--line) !important; }
+.card:hover, .card.sel, .ctile.focus { box-shadow: 0 0 0 2px var(--sysc, var(--accent)), 0 10px 24px rgba(16,20,24,.12) !important; }
+/* couch hero text sits over ARBITRARY cover art — brightening the blur (below) helps but a true-black cover is still
+   near-black at brightness(.9), so the title needs a guaranteed-contrast surface under it, not just a brighter blur.
+   a soft radial wash anchored bottom-left (where the text block actually sits) does that without flattening the art
+   the way an edge-to-edge scrim would. */
+.chero{background:radial-gradient(ellipse 160% 130% at 0% 100%, rgba(243,246,249,.94) 0%, rgba(243,246,249,.7) 40%, rgba(243,246,249,.25) 72%, rgba(243,246,249,0) 100%);
+  margin:calc(-40px*var(--u,1)) 0 0 calc(-40px*var(--u,1));padding:calc(40px*var(--u,1)) calc(40px*var(--u,1)) calc(80px*var(--u,1));border-radius:0}
+.chero .sys{text-shadow:none}
+.chero .desc{color:var(--fg);opacity:.78}
+.detail .banner .bd, .bgart { filter: blur(20px) brightness(.9) saturate(1.05) !important; }
+.couchwrap.hasskin .bgart { filter: blur(24px) brightness(.82) saturate(.5) !important; }
+.cfade { background: linear-gradient(90deg, rgba(243,246,249,.85) 0%, rgba(243,246,249,0) 55%), linear-gradient(0deg, var(--bg) 0%, rgba(243,246,249,0) 50%) !important; }
+.chero .hint span, .chud { text-shadow: none; }
+.chero .hint span { background: rgba(255,255,255,.75) !important; border: 1px solid var(--line); backdrop-filter: blur(6px); color: var(--fg); }
+.modal, .cov { background: rgba(16,20,24,.35) !important; }
+.toast { box-shadow: 0 10px 30px rgba(16,20,24,.18) !important; }
+.rail { background: #0F1418 !important; } /* the one dark surface left on purpose: an app rail should anchor the eye like a taskbar, not blend into the page */

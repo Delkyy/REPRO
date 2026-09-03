@@ -3,20 +3,25 @@
 // the ink. writes assets/systems/<id>.svg. review with test/logosheet.js.
 //   npx electron scripts/flatten-svg.js <srcdir> <id> [id...]     e.g. %LOCALAPPDATA%/Temp/commons ps4 ps5
 //   --keep-white   some sources draw the mark IN white on a colored plate; then white is the ink and the plate is dropped.
+//   --only=2,3,8,9 keep just these element indices (from scripts/svg-explode.js). for marks built from ink + gloss/shadow layers.
+//                  with --only, nothing else is dropped: you picked the ink, whites included (icons often stroke a glyph in white).
 const { app, BrowserWindow } = require('electron');
 const fs = require('fs'), path = require('path');
 const args = process.argv.slice(2).filter(a => !a.startsWith('--')), flags = process.argv.filter(a => a.startsWith('--'));
 const SRC = args[0], ids = args.slice(1), OUT = path.join(__dirname, '..', 'assets', 'systems');
 const keepWhite = flags.includes('--keep-white');
+const only = (flags.find(f => f.startsWith('--only=')) || '').slice(7).split(',').filter(Boolean).map(Number);
 app.whenReady().then(async () => {
   const win = new BrowserWindow({ show: false, width: 800, height: 800, webPreferences: { offscreen: true } });
   await win.loadURL('about:blank');
   for (const id of ids) {
     const src = fs.readFileSync(path.join(SRC, id + '.svg'), 'utf8');
     const out = await win.webContents.executeJavaScript(`(() => {
-      const keepWhite = ${keepWhite};
+      const keepWhite = ${keepWhite}, only = ${JSON.stringify(only)};
       document.body.innerHTML = ${JSON.stringify(src)};
       const svg = document.querySelector('svg');
+      // same index space as scripts/svg-explode.js: drawn elements outside defs/mask/clipPath
+      if (only.length) [...svg.querySelectorAll('path,rect,circle,ellipse,polygon,polyline')].filter(e => !e.closest('defs,mask,clipPath,pattern,symbol')).forEach((e, i) => { if (!only.includes(i)) e.remove(); });
       const isWhite = c => { if (!c || c === 'none') return false; const m = c.match(/[0-9]+/g); return m && m.length >= 3 && m.slice(0, 3).every(v => +v > 235); };
       // fill-rule/evenodd holes: keep them, they're how counters are cut. inkscape puts it in style= (often on a parent <g>),
       // and we strip style, so pin the COMPUTED rule onto every drawn element as an attribute first.
@@ -31,15 +36,17 @@ app.whenReady().then(async () => {
         const cs = getComputedStyle(e);
         const fill = cs.fill, stroke = cs.stroke;
         const white = isWhite(fill) || (fill === 'none' && isWhite(stroke));
-        if (white && !keepWhite) { e.remove(); removed++; continue; }
-        if (!white && keepWhite) { e.remove(); removed++; continue; }
+        if (!only.length) {
+          if (white && !keepWhite) { e.remove(); removed++; continue; }
+          if (!white && keepWhite) { e.remove(); removed++; continue; }
+        }
         if (fill === 'none' && stroke === 'none') { e.remove(); removed++; continue; }
         e.removeAttribute('style'); e.removeAttribute('class');
         if (fill !== 'none') e.setAttribute('fill', '#000'); else e.setAttribute('fill', 'none');
         if (stroke !== 'none') e.setAttribute('stroke', '#000');
         e.removeAttribute('fill-opacity'); e.removeAttribute('opacity'); e.removeAttribute('stroke-opacity');
       }
-      svg.querySelectorAll('defs,style,metadata,title,desc,image,filter,mask,linearGradient,radialGradient,pattern').forEach(n => n.remove());
+      svg.querySelectorAll('defs,style,metadata,title,desc,image,filter,mask,linearGradient,radialGradient,pattern,text').forEach(n => n.remove());
       svg.querySelectorAll('*').forEach(n => { for (const a of ['opacity', 'fill-opacity', 'style', 'class', 'filter', 'mask', 'clip-path']) n.removeAttribute(a); });
       svg.querySelectorAll('g').forEach(g => { if (!g.querySelector('path,rect,circle,ellipse,polygon,polyline,line,text')) g.remove(); });
       const b = svg.getBBox(); const pad = Math.max(b.width, b.height) * 0.03;

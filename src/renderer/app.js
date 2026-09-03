@@ -91,10 +91,11 @@ function renderMain() {
     box.innerHTML = l.map(g => `<div class="card ${sel == g.id ? 'sel' : ''}" data-id="${esc(g.id)}" ${sysc(g.sys)}>
       ${artEl(g)}${g.fav ? '<span class="fav">★</span>' : ''}${g.emulator ? '<span class="badge">ALT EMU</span>' : ''}
       ${g.playtime ? `<div class="pb"><i style="width:${Math.min(100, g.playtime / 36)}%"></i></div>` : ''}<div class="sysb"></div>
-      <div class="over"><b>${esc(g.title)}</b><div class="acts"><button class="p" data-play="${esc(g.id)}">▶ Play</button><button class="cog" data-cog="${esc(g.id)}" title="settings">⚙</button></div></div></div>`).join('');
+      <div class="over"><b>${esc(g.title)}</b><div class="acts"><button class="p" data-play="${esc(g.id)}">▶ Play</button><button class="cog" data-cog="${esc(g.id)}" title="settings">⚙</button>${!g.art ? `<button class="cog" data-scrape="${esc(g.id)}" title="scrape art">🖼</button>` : ''}</div></div></div>`).join('');
   }
   box.querySelectorAll('[data-id]').forEach(c => c.onclick = e => {
     if (e.target.closest('[data-play]')) return launch(c.dataset.id);
+    if (e.target.closest('[data-scrape]')) { scrapeOne(c.dataset.id); return; }
     sel = c.dataset.id; if (e.target.closest('[data-cog]')) window._openTab = 'launch';
     renderMain(); renderDetail(); app.classList.remove('nodetail');
   });
@@ -228,6 +229,14 @@ async function loadSavesTab(g) {
   });
 }
 async function launch(id) { const g = byId(id); const r = await repro.launch(id); if (r.error) return toast(`<b>can't launch:</b> ${esc(r.error)}`); toast(`launching <b>${esc(g.title)}</b>`); }
+async function scrapeOne(id) {
+  const g = byId(id); toast(`scraping art for <b>${esc(g.title)}</b>…`);
+  const r = await repro.scrapeOne(id);
+  if (r.error) return toast(`<b>scrape failed:</b> ${esc(r.error)}`);
+  Object.assign(g, { art: r.artPath || g.art, desc: r.desc || g.desc, year: r.year || g.year });
+  toast(r.artPath ? `got art for <b>${esc(g.title)}</b>` : `no art found for <b>${esc(g.title)}</b> — try IGDB credentials in Settings`);
+  renderAll();
+}
 repro.onGameExited(async ({ gameId, secs }) => { await refresh(); const g = byId(gameId); toast(`back. <b>${esc(g?.title)}</b>, ${fmtPt(secs)} this session.`); });
 
 /* ---------- couch mode (ported from sketch 001) ---------- */
@@ -254,7 +263,7 @@ function cSetFocus(i) {
   strip.style.transform = `translateX(-${Math.min(maxX, Math.max(0, t.offsetLeft - pad - t.offsetWidth * 0.07))}px)`;
   const g = byId(cList[cFocus]);
   const h = $('#chero'); h.classList.remove('swap'); void h.offsetWidth; h.classList.add('swap'); h.setAttribute('style', sysStyle(g.sys));
-  h.innerHTML = `<div class="sys">${logo(g.sys)}${esc(sysName(g.sys))} · ${esc(emuName(g.sys))}</div><h1>${esc(g.title)}</h1><div class="meta"><span>${fmtPt(g.playtime)} played</span><span>last: ${fmtLast(g.lastPlayed)}</span>${g.fav ? '<span>★</span>' : ''}</div><div class="hint"><span class="p">▶ Play</span><span>★</span></div>`;
+  h.innerHTML = `<div class="sys">${logo(g.sys)}${esc(sysName(g.sys))} · ${esc(emuName(g.sys))}</div><h1>${esc(g.title)}</h1><div class="meta"><span>${fmtPt(g.playtime)} played</span><span>last: ${fmtLast(g.lastPlayed)}</span>${g.fav ? '<span>★</span>' : ''}${g.year ? `<span>${g.year}</span>` : ''}</div>${g.desc ? `<div class="desc">${esc(g.desc)}</div>` : ''}<div class="hint"><span class="p">▶ Play</span><span>★</span></div>`;
   const a = $('#bgA'), b = $('#bgB'), nxt = bgFlip ? a : b, cur = bgFlip ? b : a; bgFlip = !bgFlip;
   nxt.style.backgroundImage = g.art ? `url("${fileUrl(g.art)}")` : 'none';
   nxt.classList.add('on'); cur.classList.remove('on');
@@ -299,18 +308,42 @@ async function openSettings() {
   if (gen !== modalGen || !$('#modal').classList.contains('open')) return; // dialog moved on or closed while we were scanning
   const emus = { ...S.emulators };
   for (const f of found) if (!emus[f.recipe]?.exe) emus[f.recipe] = { exe: f.exe, name: f.name, detected: true };
-  const emuRows = Object.entries(emus).map(([id, e]) => `<div class="slot"><div class="sh" style="background:${e.exe ? '#3ddc84' : 'var(--accent2)'}"></div><div class="t"><b>${esc(e.name || id)}</b>${e.detected && !S.emulators[id]?.exe ? ' <small style="color:var(--accent2)">found, not added</small>' : ''}<small>${esc(e.exe || 'not set')}</small></div><div class="act" style="opacity:1"><button data-exe="${id}" data-found="${esc(e.exe || '')}">${e.detected && !S.emulators[id]?.exe ? 'add' : 'change…'}</button></div></div>`).join('');
+  const emuRows = Object.entries(emus).map(([id, e]) => `<div class="slot"><div class="sh emu" style="--st:${e.exe ? '#3ddc84' : 'var(--accent2)'}">${logo(id)}</div><div class="t"><b>${esc(e.name || id)}</b>${e.detected && !S.emulators[id]?.exe ? ' <small style="color:var(--accent2)">found, not added</small>' : ''}<small>${esc(e.exe || 'not set')}</small></div><div class="act" style="opacity:1"><button data-exe="${id}" data-found="${esc(e.exe || '')}">${e.detected && !S.emulators[id]?.exe ? 'add' : 'change…'}</button></div></div>`).join('');
   const dirRows = (S.config.romDirs || []).map(r => `<div class="slot"><div class="sh" style="background:var(--bg)"></div><div class="t">${esc(r.path)}<small>${r.system ? 'forced: ' + esc(sysName(r.system)) : 'system guessed per file'}</small></div><div class="act" style="opacity:1"><button data-rm="${esc(r.path)}">remove</button></div></div>`).join('');
   $('#modal').innerHTML = `<div class="box"><div class="mh"><h3>Settings</h3><button class="icon" id="mClose">✕</button></div><div class="mb">
     <h5>Emulators</h5>${emuRows || '<div class="hint">none found.</div>'}<button class="btnrow" id="mAddExe" style="margin-top:8px;display:block;padding:7px 12px;border:1px solid var(--line);border-radius:6px">add exe…</button>
     <h5 style="margin-top:16px">Rom folders</h5>${dirRows || '<div class="hint">none yet.</div>'}<button id="mAddDir" style="margin-top:8px;display:block;padding:7px 12px;border:1px solid var(--line);border-radius:6px">+ add folder…</button>
     <h5 style="margin-top:16px">Config</h5><div class="hint">everything lives next to the app: ${esc(ROOT)}</div>
     <h5 style="margin-top:16px">Hub key</h5><div class="hint">press <code style="background:var(--panel);padding:2px 6px;border-radius:4px">${esc(S.config.hubKey || 'Ctrl+Alt+H')}</code>${S.config.hubKeyOk === false ? ' <b style="color:var(--accent2)">— not registered, another app has this combo</b>' : ''} anywhere, even with the emulator focused, to close the running game and jump back to REPRO. map a controller's Guide/Home button to it in Windows or Steam Input for a one-button "back to hub". <button id="mHubKey" style="margin-top:6px;display:block;padding:6px 10px;border:1px solid var(--line);border-radius:6px">change…</button></div>
+    <h5 style="margin-top:16px">Art &amp; metadata scraper</h5><div class="hint">
+      Downloads box art + descriptions from IGDB (free, needs Twitch credentials) and libretro thumbnail CDN (no credentials, art only).<br><br>
+      <b>IGDB</b>: <a href="https://dev.twitch.tv/console/apps" style="color:var(--accent2)" target="_blank">get credentials</a> — create a Twitch app, OAuth redirect = localhost.<br>
+      <div class="kv" style="margin-top:8px;max-width:420px">
+        <span>Client ID</span><input id="igdbId" placeholder="paste client_id" value="${esc(S.config.igdb?.clientId||'')}" style="max-width:280px">
+        <span>Secret</span><input id="igdbSec" type="password" placeholder="paste client_secret" value="${esc(S.config.igdb?.clientSecret||'')}" style="max-width:280px">
+      </div>
+      <div class="btnrow" style="margin-top:10px">
+        <button id="mScrapeAll" style="background:var(--accent);color:#fff;border:0;padding:8px 14px;border-radius:6px;font-weight:700">▼ Scrape all (${S.games.filter(g=>!g.art).length} without art)</button>
+        <button id="mM3u" style="padding:8px 14px;border:1px solid var(--line);border-radius:6px">Generate .m3u for multi-disc games</button>
+      </div>
+      <div id="scrapeLog" style="margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--muted);min-height:20px"></div>
+    </div>
     </div></div>`;
   $('#mClose').onclick = () => $('#modal').classList.remove('open');
   $('#modal').querySelectorAll('[data-exe]').forEach(b => b.onclick = async () => { const found2 = b.dataset.found; const p = found2 || await repro.pickExe(); if (p) { S = await repro.setEmulator({ id: b.dataset.exe, exe: p }); openSettings(); } });
   $('#mAddExe').onclick = addExe;
-  const mhk = $('#mHubKey'); if (mhk) mhk.onclick = () => changeHubKey(openSettings);
+  const mhk = $('#mHubKey'); if (mhk) mhk.onclick = async () => { await changeHubKey(); openSettings(); };
+  const msa = $('#mScrapeAll'); if (msa) msa.onclick = async () => {
+    const id = $('#igdbId')?.value.trim(); const sec = $('#igdbSec')?.value.trim();
+    if (id && sec) await repro.setIgdb({ clientId: id, clientSecret: sec });
+    msa.disabled = true; msa.textContent = 'scraping…';
+    const log = $('#scrapeLog');
+    repro.onScrapeProgress(d => { if (log) log.textContent = `${d.i}/${d.total}: ${d.title}${d.found?' ✓':''}`; });
+    const r = await repro.scrapeAll(id ? { clientId: id, clientSecret: sec } : {});
+    if (log) log.innerHTML = r.error ? `<b style="color:var(--accent)">${esc(r.error)}</b>` : `done: ${r.found} art found, ${r.errors} errors${r.m3u ? `, ${r.m3u} .m3u created` : ''}`;
+    S = await repro.snapshot(); renderAll(); msa.disabled = false; msa.textContent = `▼ Scrape all (${S.games.filter(g=>!g.art).length} without art)`;
+  };
+  const mm3u = $('#mM3u'); if (mm3u) mm3u.onclick = async () => { const r = await repro.generateM3u(); toast(`${r.created} .m3u file${r.created!==1?'s':''} created`); };
   $('#mAddDir').onclick = async () => { const d = await repro.pickFolder(); if (d) { S = await repro.addRomDir({ dir: d }); openSettings(); renderAll(); } };
   $('#modal').querySelectorAll('[data-rm]').forEach(b => b.onclick = async () => { S = await repro.removeRomDir(b.dataset.rm); openSettings(); renderAll(); });
 }

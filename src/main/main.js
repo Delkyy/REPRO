@@ -5,6 +5,7 @@ const fsp = require('fs/promises');
 const path = require('path');
 const os = require('os');
 const { spawn } = require('child_process');
+const { scrapeLibrary, scrapeGame } = require('./scraper');
 
 // ---------- portable root: everything lives next to the exe (or the repo when running from source)
 const ROOT = app.isPackaged ? path.dirname(process.execPath) : path.join(__dirname, '..', '..');
@@ -23,7 +24,7 @@ const SYSTEMS = Object.fromEntries(Object.entries(SYSDB).map(([k, v]) => [k, v.n
 const readJson = (p, fallback) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return fallback; } };
 const writeJson = (p, v) => fs.writeFileSync(p, JSON.stringify(v, null, 2));
 
-let config = readJson(P.config, { emulators: {}, romDirs: [], mode: 'desktop', ui: 'desk', theme: 'billet', views: [], panels: { side: true, detail: true }, cardSize: 150, hubKey: 'Ctrl+Alt+H' });
+let config = readJson(P.config, { emulators: {}, romDirs: [], mode: 'desktop', ui: 'desk', theme: 'billet', views: [], panels: { side: true, detail: true }, cardSize: 150, hubKey: 'Ctrl+Alt+H', igdb: {} });
 let library = readJson(P.library, { games: {} }); // keyed by rom path
 const saveConfig = () => writeJson(P.config, config);
 const saveLibrary = () => writeJson(P.library, library);
@@ -516,3 +517,67 @@ ipcMain.handle('renameSlot', (_, { id, from, to }) => { const g = library.games[
 ipcMain.handle('deleteSlot', (_, { id, file }) => { const g = library.games[id]; if (!g) return { error: 'no such game' }; return deleteSlot(g, file); });
 ipcMain.handle('openSaveFolder', (_, id) => { const g = library.games[id]; if (!g) return; const d = getSaveDir(g); fs.mkdirSync(d, { recursive: true }); shell.openPath(d); });
 ipcMain.on('quit', () => app.quit());
+
+// ---- multi-disc: generate .m3u for disc sets ----
+// Groups games by title similarity (strips "Disc N" suffix), writes a .m3u next to the discs
+function generateM3u() {
+  const games = Object.values(library.games);
+  const groups = {};
+  for (const g of games) {
+    const key = g.sys + '::' + g.title.replace(/\s*[\(\[,]\s*Disc\s*\d+[^\)\]]*[\)\]]?\s*/i, '').replace(/\s*-\s*Disc\s*\d+\s*/i, '').toLowerCase().trim();
+    (groups[key] ??= []).push(g);
+  }
+  let created = 0;
+  for (const grp of Object.values(groups)) {
+    if (grp.length < 2) continue;
+    grp.sort((a, b) => a.title.localeCompare(b.title));
+    const baseTitle = grp[0].title.replace(/\s*[\(\[,]\s*Disc\s*\d+[^\)\]]*[\)\]]?\s*/i, '').replace(/\s*-\s*Disc\s*\d+\s*/i, '').trim();
+    const dir = path.dirname(grp[0].path);
+    const m3uPath = path.join(dir, baseTitle + '.m3u');
+    const content = grp.map(g => path.basename(g.path)).join('\n') + '\n';
+    if (!fs.existsSync(m3uPath)) { fs.writeFileSync(m3uPath, content); created++; }
+  }
+  return created;
+}
+
+// ---- scraper IPC ----
+let scrapeActive = false;
+ipcMain.handle('scrapeAll', async (_, { clientId, clientSecret } = {}) => {
+  if (scrapeActive) return { error: 'already scraping' };
+  scrapeActive = true;
+  const creds = clientId ? { clientId, clientSecret } : (config.igdb?.clientId ? config.igdb : null);
+  const games = Object.values(library.games);
+  let done = 0, found = 0, errors = 0;
+  try {
+    const results = await scrapeLibrary(games, P.art, creds, (i, total, g, r) => {
+      done = i;
+      if (r.artPath) { library.games[g.id].art = r.artPath; found++; }
+      if (r.desc) library.games[g.id].desc = r.desc;
+      if (r.year) library.games[g.id].year = r.year;
+      if (r.genres?.length) library.games[g.id].genres = r.genres;
+      if (r.igdbId) library.games[g.id].igdbId = r.igdbId;
+      if (r.error) errors++;
+      if (i % 5 === 0 || i === total) saveLibrary();
+      send('scrape-progress', { i, total, title: g.title, found: !!r.artPath });
+    });
+    saveLibrary();
+    const m3uCount = generateM3u();
+    return { ok: true, done, found, errors, m3u: m3uCount };
+  } finally { scrapeActive = false; }
+});
+ipcMain.handle('scrapeOne', async (_, gameId) => {
+  const g = library.games[gameId]; if (!g) return { error: 'no such game' };
+  const artDir = path.join(P.art, g.sys);
+  const creds = config.igdb?.clientId ? config.igdb : null;
+  const r = await scrapeGame(g, artDir, creds);
+  if (r.artPath) library.games[g.id].art = r.artPath;
+  if (r.desc) library.games[g.id].desc = r.desc;
+  if (r.year) library.games[g.id].year = r.year;
+  if (r.genres?.length) library.games[g.id].genres = r.genres;
+  if (r.igdbId) library.games[g.id].igdbId = r.igdbId;
+  saveLibrary();
+  return { ok: true, ...r };
+});
+ipcMain.handle('setIgdb', (_, { clientId, clientSecret }) => { config.igdb = { clientId, clientSecret }; saveConfig(); return { ok: true }; });
+ipcMain.handle('generateM3u', () => { const n = generateM3u(); return { created: n }; });
+ipcMain.handle('scrapeStatus', () => ({ active: scrapeActive, hasCredentials: !!(config.igdb?.clientId) }));
