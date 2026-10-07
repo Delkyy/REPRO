@@ -4,7 +4,7 @@
   "description": "REPRO: open-source emulator hub",
   "main": "src/main/main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test test/main.test.js",
     "start": "electron .",
     "brand": "electron test/brandshot.js && python scripts/make-ico.py",
     "shot": "electron test/couchshot.js",

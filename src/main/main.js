@@ -12,7 +12,8 @@ const { scrapeLibrary, scrapeGame } = require('./scraper');
 //   BUNDLE = the asar (electron reads it transparently as a normal folder)
 //   ROOT   = PORTABLE_EXECUTABLE_DIR — the folder the user put the .exe in
 const BUNDLE = app.isPackaged ? app.getAppPath() : path.join(__dirname, '..', '..');
-const ROOT   = app.isPackaged
+// REPRO_ROOT overrides the user-data folder (tests point it at a temp dir so they never touch your real config/library)
+const ROOT   = process.env.REPRO_ROOT ? path.resolve(process.env.REPRO_ROOT) : app.isPackaged
   ? (process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(process.execPath))
   : path.join(__dirname, '..', '..');
 
@@ -117,7 +118,7 @@ async function getLocalDrives() {
 // onProgress(found, scanned, currentPath) — called roughly every 500 files
 const SKIP_DIRS = new Set(['Windows','$RECYCLE.BIN','System Volume Information','Program Files','Program Files (x86)',
   'ProgramData','node_modules','AppData','$Windows.~BT','$Windows.~WS','Boot','Recovery','Config.Msi']);
-const ROM_EXTS = new Set(Object.keys(ALL_EXT)); // built from recipes + systems.json
+// ROM_EXTS is built further down, right after ALL_EXT (const TDZ: referencing it here crashed at load)
 
 async function deepScanDrive(drive, foundRoms, onProgress) {
   let scanned = 0;
@@ -158,7 +159,7 @@ async function autoScanRoms(onProgress) {
   // add folders not already in romDirs (min 1 rom file)
   let added = 0;
   for (const [d, count] of Object.entries(dirs)) {
-    if (count >= 1 && !config.romDirs.some(r => r.path === d || d.startsWith(r.path))) {
+    if (count >= 1 && !config.romDirs.some(r => r.path === d || d.startsWith(r.path.replace(/[\\/]+$/, '') + path.sep))) {
       config.romDirs.push({ path: d, system: null });
       added++;
     }
@@ -207,6 +208,7 @@ const NOSCAN = new Set(['.exe', '.lnk', '.bin', '.elf', '.gz']); // pc games get
 for (const r of Object.values(recipes)) for (const [sys, exts] of Object.entries(r.extensions)) for (const e of exts) if (!NOSCAN.has(e)) (ALL_EXT[e] ??= new Set()).add(sys);
 // systems.json covers systems no recipe knows yet, so their roms land in the library (unlaunchable until an emulator is added)
 for (const [sys, v] of Object.entries(SYSDB)) for (const e of v.ext) if (!NOSCAN.has(e) && !/\.(zip|iso|chd|cue|bin)$/.test(e)) (ALL_EXT[e] ??= new Set()).add(sys);
+const ROM_EXTS = new Set(Object.keys(ALL_EXT)); // used by deepScanDrive; must come after ALL_EXT is filled
 
 function titleFromFile(name) {
   // drop region/language tags like (USA) (En,Ja) [!] but keep edition tags like (Hall of Fame Edition) (Disc 1)
