@@ -297,8 +297,9 @@ function setTheme(t) {
   app.dataset.theme = t;
   // find the theme's base path from the themes list (handles both asar and user themes)
   const themeEntry = (S.themes || []).find(x => x.id === t);
-  const base = themeEntry?.base || BUNDLE || ROOT;
-  $('#themeCss').href = fileUrl(base + '/themes/' + t + '/theme.css');
+  // entry.base is already the themes/ folder (BUNDLE/themes or ROOT/themes) — don't append /themes again
+  const dir = themeEntry?.base ? themeEntry.base + '/' + t : (BUNDLE || ROOT) + '/themes/' + t;
+  $('#themeCss').href = fileUrl(dir + '/theme.css');
   repro.setPref({ theme: t });
 }
 function setUI(u) { document.documentElement.style.setProperty('--u', u == 'tv' ? 1.5 : 1); repro.setPref({ ui: u }); }
