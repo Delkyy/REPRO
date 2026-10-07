@@ -4,7 +4,8 @@ let S = { games: [], unsorted: [], emulators: {}, systems: {}, sysdb: {}, config
 let filter = 'all', sel = null, view = 'grid', ROOT = '', BUNDLE = '';
 let cFocus = 0, cList = [], cRows = [];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const fileUrl = p => 'file:///' + p.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/');
+// windows "C:\x\y" -> file:///C:/x/y, linux "/home/x" -> file:///home/x (no quadruple slash). drive colon must stay literal.
+const fileUrl = p => 'file:///' + p.replace(/\\/g, '/').replace(/^\/+/, '').split('/').map((s, i) => i === 0 && /^[A-Za-z]:$/.test(s) ? s : encodeURIComponent(s)).join('/');
 const fmtPt = s => !s ? '—' : s < 3600 ? `${Math.round(s / 60)}m` : `${Math.floor(s / 3600)}h ${Math.round((s % 3600) / 60)}m`;
 const fmtLast = t => { if (!t) return 'never'; const d = (Date.now() - t) / 864e5; return d < 1 ? 'today' : d < 2 ? 'yesterday' : d < 7 ? `${Math.floor(d)} days ago` : new Date(t).toLocaleDateString([], { month: 'short', day: 'numeric' }); };
 const sysName = k => S.systems[k] || k;
@@ -319,7 +320,7 @@ async function openSettings() {
   const emuRows = Object.entries(emus).map(([id, e]) => `<div class="slot"><div class="sh emu" style="--st:${e.exe ? '#3ddc84' : 'var(--accent2)'}">${logo(id)}</div><div class="t"><b>${esc(e.name || id)}</b>${e.detected && !S.emulators[id]?.exe ? ' <small style="color:var(--accent2)">found, not added</small>' : ''}<small>${esc(e.exe || 'not set')}</small></div><div class="act" style="opacity:1"><button data-exe="${id}" data-found="${esc(e.exe || '')}">${e.detected && !S.emulators[id]?.exe ? 'add' : 'change…'}</button></div></div>`).join('');
   const dirRows = (S.config.romDirs || []).map(r => `<div class="slot"><div class="sh glyph">▣</div><div class="t">${esc(r.path)}<small>${r.system ? 'forced: ' + esc(sysName(r.system)) : 'system guessed per file'}</small></div><div class="act" style="opacity:1"><button data-rm="${esc(r.path)}">remove</button></div></div>`).join('');
   $('#modal').innerHTML = `<div class="box"><div class="mh"><h3>Settings</h3><button class="icon" id="mClose">✕</button></div><div class="mb">
-    <h5>Emulators</h5>${emuRows || '<div class="hint">none found.</div>'}<button class="btnrow" id="mAddExe" style="margin-top:8px;display:block;padding:7px 12px;border:1px solid var(--line);border-radius:6px">add exe…</button>
+    <h5>Emulators</h5>${emuRows || '<div class="hint">none found.</div>'}<button class="btnrow" id="mAddExe" style="margin-top:8px;display:block;padding:7px 12px;border:1px solid var(--line);border-radius:6px">add emulator…</button>
     <h5 style="margin-top:16px">Rom folders</h5>${dirRows || '<div class="hint">none yet.</div>'}<div class="btnrow" style="margin-top:8px">
     <button id="mAddDir" style="padding:7px 12px;border:1px solid var(--line);border-radius:6px">+ add folder…</button>
     <button id="mAutoScan" style="padding:7px 12px;border:1px solid var(--accent2);color:var(--accent2);border-radius:6px;font-weight:700">🔍 scan whole PC for roms</button>
@@ -448,7 +449,10 @@ document.addEventListener('keydown', e => {
 document.addEventListener('drop', async e => {
   e.preventDefault(); const f = e.dataTransfer.files[0]; if (!f) return;
   const p = repro.pathOf(f); if (!p) return toast('could not read the dropped path');
-  if (/\.exe$/i.test(p)) { const r = await repro.detectOne(p); if (r) { S = await repro.setEmulator({ id: r.recipe, exe: p }); toast(`added <b>${esc(r.name)}</b>`); renderAll(); } else toast('unknown emulator exe, use settings → add exe for now'); }
+  // emulator binary? (.exe on windows; on linux any file a recipe recognises, e.g. dolphin-emu or DuckStation-x64.AppImage)
+  const r = await repro.detectOne(p);
+  if (r) { S = await repro.setEmulator({ id: r.recipe, exe: p }); toast(`added <b>${esc(r.name)}</b>`); renderAll(); }
+  else if (/\.(exe|appimage)$/i.test(p)) toast('unknown emulator, use settings → add emulator for now');
   else { const dir = p.replace(/[\\/][^\\/]+\.\w+$/, ''); S = await repro.addRomDir({ dir }); toast(`added folder for <b>${esc(f.name)}</b>`); renderAll(); }
 });
 setInterval(() => { const c = $('#clock'); if (c) c.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }, 1000);

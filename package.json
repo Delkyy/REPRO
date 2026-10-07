@@ -4,12 +4,13 @@
   "description": "REPRO: open-source emulator hub",
   "main": "src/main/main.js",
   "scripts": {
-    "test": "node --test test/main.test.js",
+    "test": "node --test test/*.test.js",
     "start": "electron .",
     "brand": "electron test/brandshot.js && python scripts/make-ico.py",
     "shot": "electron test/couchshot.js",
     "icon": "node scripts/make-icon.js",
-    "dist": "npm run icon && electron-builder --win portable"
+    "dist": "npm run icon && electron-builder --win portable",
+    "dist:linux": "npm run icon && electron-builder --linux AppImage"
   },
   "build": {
     "appId": "io.repro.hub",
@@ -47,6 +48,23 @@
     },
     "portable": {
       "artifactName": "${productName}-${version}-portable.exe"
+    },
+    "linux": {
+      "icon": "assets/brand/ico/icon-256.png",
+      "category": "Game",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "synopsis": "open-source emulator hub",
+      "syncDesktopName": true
+    },
+    "appImage": {
+      "artifactName": "${productName}-${version}-x86_64.AppImage"
     }
   },
   "keywords": [],
@@ -62,7 +80,8 @@
     "electron-winstaller@5.4.0": true,
     "koffi@2.16.3": true
   },
-  "dependencies": {
+  "optionalDependencies": {
     "xinput-ffi": "^4.0.2"
-  }
+  },
+  "desktopName": "repro.desktop"
 }

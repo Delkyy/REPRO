@@ -6,6 +6,7 @@ const path = require('path');
 const os = require('os');
 const { spawn } = require('child_process');
 const { scrapeLibrary, scrapeGame } = require('./scraper');
+const plat = require('./platform');
 
 // ---------- two roots: BUNDLE (packed read-only assets) and ROOT (user data next to the exe)
 // In dev both are the repo root. In the packaged portable exe they split:
@@ -13,9 +14,8 @@ const { scrapeLibrary, scrapeGame } = require('./scraper');
 //   ROOT   = PORTABLE_EXECUTABLE_DIR — the folder the user put the .exe in
 const BUNDLE = app.isPackaged ? app.getAppPath() : path.join(__dirname, '..', '..');
 // REPRO_ROOT overrides the user-data folder (tests point it at a temp dir so they never touch your real config/library)
-const ROOT   = process.env.REPRO_ROOT ? path.resolve(process.env.REPRO_ROOT) : app.isPackaged
-  ? (process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(process.execPath))
-  : path.join(__dirname, '..', '..');
+//   (linux AppImage: the folder the .AppImage sits in, since the exe itself lives in a read-only mount)
+const ROOT   = plat.userRoot({ isPackaged: app.isPackaged, devRoot: path.join(__dirname, '..', '..'), execPath: process.execPath });
 
 const P = {
   config:  path.join(ROOT,   'config.json'),
@@ -53,20 +53,27 @@ function loadRecipes() {
 let recipes = loadRecipes();
 
 const globToRe = g => new RegExp('^' + g.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$', 'i');
-function recipeForExe(exePath) {
-  const base = path.basename(exePath);
-  for (const r of Object.values(recipes)) if (r.exe.some(g => globToRe(g).test(base))) return r;
+// exe is a file path or "flatpak:<app id>". osId lets tests match the other platform's names.
+function recipeForExe(exePath, osId = plat.OS) {
+  if (plat.isFlatpak(exePath)) return Object.values(recipes).find(r => r.flatpak === plat.flatpakId(exePath)) || null;
+  const base = exePath.split(/[\\/]/).pop(); // either separator, so windows paths match from linux tests too
+  for (const r of Object.values(recipes)) if (plat.perOs(r.exe, osId).some(g => globToRe(g).test(base))) return r;
   return null;
 }
-function resolveDataDir(recipe, exePath) {
-  const vars = { exe: path.dirname(exePath), docs: path.join(os.homedir(), 'Documents'), appdata: process.env.APPDATA || '' };
-  const fill = s => s.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
-  for (const d of recipe.dataDirs || []) {
+// any platform's emulator binary name: used to skip emulator program folders during rom scans
+const isEmulatorFile = name => Object.values(recipes).some(r => plat.allOs(r.exe).some(g => globToRe(g).test(name)));
+function resolveDataDir(recipe, exePath, { osId = plat.OS, env = process.env, home = os.homedir() } = {}) {
+  if (!recipe) return null;
+  const fp = plat.flatpakId(exePath);
+  const vars = plat.pathVars({ osId, env, home, exe: fp ? null : path.dirname(exePath), flatpak: fp });
+  for (const d of plat.perOs(recipe.dataDirs, osId)) {
+    // a flatpak only ever uses its sandbox dirs ({var}); a native install never does
+    if (!!fp !== d.includes('{var}')) continue;
     // "marker?dir": only use dir if marker file exists (portable-mode detection)
     const [marker, dir] = d.includes('?') ? d.split('?') : [null, d];
-    if (marker && !fs.existsSync(fill(marker))) continue;
-    const p = fill(dir);
-    if (fs.existsSync(p)) return p;
+    if (marker) { const m = plat.fillVars(marker, vars); if (!m || !fs.existsSync(m)) continue; }
+    const p = plat.fillVars(dir, vars);
+    if (p && fs.existsSync(p)) return p;
   }
   return null;
 }
@@ -80,44 +87,36 @@ async function walk(dir, depth, hits, seen) {
     if (e.isDirectory()) {
       if (/^(node_modules|\$RECYCLE\.BIN|Windows|System Volume Information|\.git)$/i.test(e.name)) continue;
       await walk(p, depth - 1, hits, seen);
-    } else if (e.isFile() && /\.exe$/i.test(e.name)) {
+    } else if (e.isFile() || e.isSymbolicLink()) {
       const r = recipeForExe(p);
-      if (r && !seen.has(r.id)) { seen.add(r.id); hits.push({ recipe: r.id, name: r.name, exe: p, dataDir: resolveDataDir(r, p) }); }
+      if (r && !seen.has(r.id) && plat.isExecutable(p)) addHit(hits, seen, r, p);
     }
   }
 }
+function addHit(hits, seen, r, exe) { seen.add(r.id); hits.push({ recipe: r.id, name: r.name, exe, flatpak: plat.isFlatpak(exe), dataDir: resolveDataDir(r, exe) }); }
+// order = preference: REPRO's own emulators/ folder, then what's on PATH, then common folders, then flatpaks
 async function detectEmulators(extraDirs = []) {
-  const home = os.homedir();
-  const dirs = [
-    path.join(home, 'Documents'), path.join(home, 'Desktop'), path.join(home, 'Downloads'),
-    'C:\\Program Files', 'C:\\Program Files (x86)', path.join(home, 'AppData', 'Local', 'Programs'),
-    path.join(ROOT, 'emulators'), ...extraDirs,
-  ];
   const hits = [], seen = new Set();
-  for (const d of dirs) await walk(d, 4, hits, seen);
+  await walk(path.join(ROOT, 'emulators'), 4, hits, seen);
+  for (const r of Object.values(recipes)) {
+    if (seen.has(r.id)) continue;
+    for (const name of plat.perOs(r.exe).filter(g => !g.includes('*'))) {
+      const p = plat.pathDirs().map(d => path.join(d, name)).find(plat.isExecutable);
+      if (p) { addHit(hits, seen, r, p); break; }
+    }
+  }
+  for (const d of [...plat.emulatorSearchDirs(), ...extraDirs]) await walk(d, 4, hits, seen);
+  const flatpaks = await plat.listFlatpaks();
+  for (const r of Object.values(recipes)) if (!seen.has(r.id) && r.flatpak && flatpaks.has(r.flatpak)) addHit(hits, seen, r, plat.FLATPAK_PREFIX + r.flatpak);
   return hits;
 }
 
-// ---------- drive discovery (Windows: wmic logicaldisk)
-async function getLocalDrives() {
-  return new Promise(resolve => {
-    const { exec } = require('child_process');
-    exec('wmic logicaldisk get deviceid,drivetype', (err, out) => {
-      if (err) { resolve(['C:\\']); return; }
-      const drives = [];
-      for (const line of out.split('\n')) {
-        const m = line.match(/^([A-Z]:)\s+(\d)/);
-        if (m && (m[2] === '3' || m[2] === '2')) drives.push(m[1] + '\\'); // local + removable
-      }
-      resolve(drives.length ? drives : ['C:\\']);
-    });
-  });
-}
+// ---------- drive discovery: windows drive letters / linux home + mounted disks (see platform.listRoots)
+const getLocalDrives = () => plat.listRoots();
 
 // ---------- deep rom scan: walks all drives for known rom extensions
 // onProgress(found, scanned, currentPath) — called roughly every 500 files
-const SKIP_DIRS = new Set(['Windows','$RECYCLE.BIN','System Volume Information','Program Files','Program Files (x86)',
-  'ProgramData','node_modules','AppData','$Windows.~BT','$Windows.~WS','Boot','Recovery','Config.Msi']);
+const SKIP_DIRS = plat.SKIP_DIRS;
 // ROM_EXTS is built further down, right after ALL_EXT (const TDZ: referencing it here crashed at load)
 
 async function deepScanDrive(drive, foundRoms, onProgress) {
@@ -126,7 +125,7 @@ async function deepScanDrive(drive, foundRoms, onProgress) {
     let ents;
     try { ents = await fsp.readdir(dir, { withFileTypes: true }); } catch { return; }
     // skip emulator program folders
-    if (ents.some(e => e.isFile() && /\.exe$/i.test(e.name) && recipeForExe(e.name))) return;
+    if (ents.some(e => e.isFile() && isEmulatorFile(e.name))) return;
     for (const e of ents) {
       const p = path.join(dir, e.name);
       if (e.isDirectory()) {
@@ -233,7 +232,7 @@ function guessSystem(file, dirHint) {
 async function scanDir(dir, out, unsorted, forcedSys) {
   let ents; try { ents = await fsp.readdir(dir, { withFileTypes: true }); } catch { return; }
   // a folder holding an emulator exe is an emulator, not a rom folder
-  if (ents.some(e => e.isFile() && /\.exe$/i.test(e.name) && recipeForExe(e.name))) return;
+  if (ents.some(e => e.isFile() && isEmulatorFile(e.name))) return;
   for (const e of ents) {
     const p = path.join(dir, e.name);
     if (e.isDirectory()) { if (!/bios|cover|firmware|^sys$|cache|shader|textures/i.test(e.name)) await scanDir(p, out, unsorted, forcedSys); continue; }
@@ -280,9 +279,9 @@ function findLocalArt(g) {
 // where an emulator keeps things, for the 'files' panel
 function emuFolders(id, e) {
   const r = recipes[id]; if (!r || !e.exe) return [];
-  const out = [{ label: 'program', path: path.dirname(e.exe) }];
+  const out = [{ label: plat.isFlatpak(e.exe) ? 'flatpak sandbox' : 'program', path: plat.programDir(e.exe) }];
   if (e.dataDir) out.push({ label: 'config / data', path: e.dataDir });
-  const fill = s => s.replace('{data}', e.dataDir || '').replace('{exe}', path.dirname(e.exe));
+  const fill = s => s.replace('{data}', e.dataDir || '').replace('{exe}', plat.programDir(e.exe));
   for (const [sys, sv] of Object.entries(r.saves || {})) if (sv !== 'hdd-image') { const p = fill(sv); if (fs.existsSync(p)) out.push({ label: `saves (${SYSTEMS[sys] || sys})`, path: p }); }
   for (const [sys, st] of Object.entries(r.states || {})) { const p = fill(st); if (fs.existsSync(p)) out.push({ label: `save states (${SYSTEMS[sys] || sys})`, path: p }); }
   for (const b of r.bios || []) { const p = fill(b); if (fs.existsSync(p)) out.push({ label: 'bios', path: p }); }
@@ -290,10 +289,10 @@ function emuFolders(id, e) {
 }
 function snapshot() {
   const emus = {};
-  for (const [id, e] of Object.entries(config.emulators)) emus[id] = { ...e, name: recipes[id]?.name || id, systems: recipes[id]?.systems || [], exeDir: e.exe ? path.dirname(e.exe) : null, folders: emuFolders(id, e) };
+  for (const [id, e] of Object.entries(config.emulators)) emus[id] = { ...e, name: recipes[id]?.name || id, systems: recipes[id]?.systems || [], exeDir: plat.programDir(e.exe), flatpak: plat.isFlatpak(e.exe), folders: emuFolders(id, e) };
   function readThemeDir(base) { try { return fs.readdirSync(base).filter(d => fs.existsSync(path.join(base, d, 'theme.json'))).map(d => ({ id: d, ...readJson(path.join(base, d, 'theme.json'), {}), base })); } catch { return []; } }
   const themes = [...readThemeDir(P.themes), ...(ROOT !== BUNDLE ? readThemeDir(path.join(ROOT, 'themes')) : [])].reduce((a, t) => { a[t.id] = t; return a; }, {});
-  return { games: Object.values(library.games), unsorted: library.unsorted || [], emulators: emus, systems: SYSTEMS, sysdb: SYSDB, root: ROOT, bundle: BUNDLE, themes: Object.values(themes), recipeArgs: Object.fromEntries(Object.entries(recipes).map(([k, r]) => [k, r.args])), config: { mode: config.mode, ui: config.ui, theme: config.theme, romDirs: config.romDirs, views: config.views || [], panels: config.panels || { side: true, detail: true }, cardSize: config.cardSize || 150, hubKey: config.hubKey || 'Ctrl+Alt+H', hubKeyOk: hubKeyOk } };
+  return { games: Object.values(library.games), unsorted: library.unsorted || [], emulators: emus, systems: SYSTEMS, sysdb: SYSDB, root: ROOT, bundle: BUNDLE, themes: Object.values(themes), recipeArgs: Object.fromEntries(Object.entries(recipes).map(([k, r]) => [k, r.args])), os: plat.OS, config: { mode: config.mode, ui: config.ui, theme: config.theme, romDirs: config.romDirs, views: config.views || [], panels: config.panels || { side: true, detail: true }, cardSize: config.cardSize || 150, hubKey: config.hubKey || 'Ctrl+Alt+H', hubKeyOk: hubKeyOk } };
 }
 // duplicates: same title across different systems isn't a dupe, but same title+sys with a different path is
 function findDuplicates() {
@@ -419,7 +418,7 @@ function patchEmulatorMemcardDir(id, e) {
     // Set Card1Type to PerGameTitle so each game gets its own card named <Title>_1.mcd
     s = s.replace(/^Card1Type\s*=.*/m, 'Card1Type = PerGameTitle');
     // Set the directory to our saves/ps1 folder — use absolute path (safest)
-    const absDir = saveDir.split(path.sep).join('\\');
+    const absDir = saveDir; // path.join already gave native separators
     // Directory key is in [MemoryCards] section; replace it or add it
     if (s.includes('[MemoryCards]')) {
       s = s.replace(/^(Directory\s*=.*)$/m, `Directory = ${absDir}`);
@@ -427,8 +426,6 @@ function patchEmulatorMemcardDir(id, e) {
         s = s.replace('[MemoryCards]', `[MemoryCards]\nDirectory = ${absDir}`);
       }
     }
-    // Remove hardcoded Card1Path
-    s = s.replace(/^Card1Path\s*=.*/m, '');
     // Remove any hardcoded Card1Path so the auto-named file is used
     s = s.replace(/^Card1Path\s*=.*/m, '');
     fs.writeFileSync(ini, s);
@@ -441,7 +438,7 @@ function patchEmulatorMemcardDir(id, e) {
     const saveDir = path.join(SAVE_DIR, 'ps2');
     fs.mkdirSync(saveDir, { recursive: true });
     // PCSX2 uses an absolute or relative path; absolute is safest here
-    s = s.replace(/^MemoryCards\s*=.*/m, `MemoryCards = ${saveDir.split(path.sep).join('\\')}`);
+    s = s.replace(/^MemoryCards\s*=.*/m, `MemoryCards = ${saveDir}`);
     // McdFolderAutoManage already true from user's ini — ensure it stays
     if (!/McdFolderAutoManage/.test(s)) {
       s = s.replace(/(\[EmuCore\])/, '$1\nMcdFolderAutoManage = true');
@@ -457,6 +454,7 @@ function patchAllEmulatorMemcardDirs() {
 }
 // ---------- launch
 let running = null;
+function launchBare(exe) { const c = plat.spawnEmu(exe, [], { extraDirs: [SAVE_DIR], spawn: { detached: true } }); c.on('error', err => send('menu', 'toast', 'launch failed: ' + err.message)); c.unref(); }
 function emulatorFor(sys) {
   for (const [id, e] of Object.entries(config.emulators)) if (recipes[id]?.systems.includes(sys) && e.exe) return { id, ...e, recipe: recipes[id] };
   return null;
@@ -471,12 +469,14 @@ function launch(gameId) {
   try { saveInfo = prepareSave(g); snapshotSave(g); } catch(e) { console.warn('save prep failed:', e.message); }
   const argsTpl = g.args || emu.recipe.args[g.sys] || ['{rom}'];
   const savePath = saveInfo?.activePath || '';
-  const args = argsTpl.map(a => a.replace('{rom}', g.path).replace('{dir}', path.dirname(emu.exe)).replace('{save}', savePath));
+  const args = argsTpl.map(a => a.replace('{rom}', g.path).replace('{dir}', plat.programDir(emu.exe)).replace('{save}', savePath));
   const started = Date.now();
   let child;
-  try { child = spawn(emu.exe, args, { cwd: path.dirname(emu.exe), detached: false, stdio: 'ignore' }); }
+  // flatpak emulators get the rom folder (read-only) and REPRO's saves folder punched into their sandbox
+  try { child = plat.spawnEmu(emu.exe, args, { roDirs: [path.dirname(g.path)], extraDirs: [SAVE_DIR] }); }
   catch (e) { return { error: e.message }; }
-  running = { gameId, pid: child.pid, started, child };
+  child.on('error', err => { running = null; send('menu', 'toast', `couldn't start ${emu.recipe?.name || emu.id}: ${err.message}`); win?.restore(); });
+  running = { gameId, pid: child.pid, started, child, exe: emu.exe };
   win?.minimize();
   child.on('exit', () => {
     const secs = Math.round((Date.now() - started) / 1000);
@@ -490,19 +490,19 @@ function launch(gameId) {
 }
 function killRunning() {
   if (!running) return { error: 'nothing is running' };
-  try {
-    // taskkill /T also kills child processes some emulators spawn (helper/render processes)
-    spawn('taskkill', ['/PID', String(running.pid), '/T', '/F']);
-  } catch (e) { try { running.child.kill(); } catch {} }
+  // whole tree: some emulators spawn helper/render processes (taskkill /T on windows, process group on linux)
+  try { plat.killTree(running.pid, running.exe); } catch (e) { try { running.child.kill(); } catch {} }
   return { ok: true };
 }
 
 // ---------- controller Guide/Home button hook (xinput-ffi, no node-gyp)
 // XInputGetStateEx (ordinal 100) exposes the Guide button which standard XInputGetState hides.
 // Source: https://github.com/xan105/node-xinput-ffi
-let guidePoller = null;
+let guidePoller = null, guideStop = null;
 async function startGuideHook() {
   if (process.argv.includes('--smoke')) return; // skip in test mode
+  if (plat.OS === 'linux') { guideStop = plat.startLinuxGuideHook(onGuidePress); return; } // evdev BTN_MODE, no native module
+  if (plat.OS !== 'win') return;
   let xif;
   try { xif = await import('xinput-ffi'); } catch (e) { console.warn('xinput-ffi not available, Guide hook disabled:', e.message); return; }
   const { getStateEx, listConnected } = xif;
@@ -521,7 +521,7 @@ async function startGuideHook() {
     } catch {}
   }, 50); // 20hz — low enough not to burn CPU, responsive enough for a UI button
 }
-function stopGuideHook() { if (guidePoller) { clearInterval(guidePoller); guidePoller = null; } }
+function stopGuideHook() { if (guidePoller) { clearInterval(guidePoller); guidePoller = null; } if (guideStop) { guideStop(); guideStop = null; } }
 function onGuidePress() {
   if (!running) { win?.show(); win?.focus(); return; }
   killRunning();
@@ -558,7 +558,7 @@ function buildMenu() {
       { label: 'Scale', submenu: [ { label: 'Desk', click: () => send('menu', 'ui', 'desk') }, { label: 'TV', click: () => send('menu', 'ui', 'tv') } ] },
       { type: 'separator' }, { role: 'togglefullscreen' }, { role: 'reload' }, { role: 'toggleDevTools' } ] },
     { label: 'Emulators', submenu: Object.keys(config.emulators).length ? Object.entries(config.emulators).map(([id, e]) => ({ label: recipes[id]?.name || id, submenu: [
-        { label: 'Launch (no game)', click: () => spawn(e.exe, [], { cwd: path.dirname(e.exe), detached: true, stdio: 'ignore' }).unref() },
+        { label: 'Launch (no game)', click: () => launchBare(e.exe) },
         { type: 'separator' },
         ...emuFolders(id, e).map(f => ({ label: 'Open ' + f.label, click: () => shell.openPath(f.path) })),
       ] })) : [{ label: 'none set up yet', enabled: false }] },
@@ -576,7 +576,7 @@ function buildMenu() {
 function createWindow() {
   win = new BrowserWindow({
     width: 1400, height: 860, minWidth: 700, minHeight: 500,
-    backgroundColor: '#0C0C0D', title: 'REPRO', icon: path.join(ROOT, 'assets', 'brand', 'icon.ico'),
+    backgroundColor: '#0C0C0D', title: 'REPRO', icon: path.join(BUNDLE, 'assets', 'brand', plat.OS === 'win' ? 'icon.ico' : 'ico/icon-256.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true },
   });
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
@@ -598,10 +598,12 @@ function registerHubKey() {
   buildMenu();
   return hubKeyOk;
 }
+// wayland: global shortcuts only work through the xdg GlobalShortcuts portal (KDE/GNOME ask the user once)
+if (plat.OS === 'linux') app.commandLine.appendSwitch('enable-features', 'GlobalShortcutsPortal');
 app.whenReady().then(() => { if (!process.argv.includes('--smoke')) { createWindow(); startGuideHook(); patchAllEmulatorMemcardDirs(); } });
 app.on('window-all-closed', () => app.quit());
 app.on('will-quit', () => { globalShortcut.unregisterAll(); stopGuideHook(); });
-module.exports = { detectEmulators, scanLibrary, snapshot, config, saveConfig, recipes, resolveDataDir, ROOT };
+module.exports = { detectEmulators, scanLibrary, snapshot, config, saveConfig, recipes, resolveDataDir, recipeForExe, isEmulatorFile, ROOT };
 
 // ---------- ipc
 ipcMain.handle('snapshot', () => snapshot());
@@ -610,13 +612,13 @@ ipcMain.handle('scan', async () => scanLibrary());
 ipcMain.handle('launch', (_, id) => launch(id));
 ipcMain.handle('setEmulator', (_, { id, exe }) => { config.emulators[id] = { exe, dataDir: resolveDataDir(recipes[id], exe) }; saveConfig(); buildMenu(); try { patchEmulatorMemcardDir(id, config.emulators[id]); } catch {} return snapshot(); });
 ipcMain.handle('openPath', (_, p) => shell.openPath(p));
-ipcMain.handle('launchEmu', (_, id) => { const e = config.emulators[id]; if (!e?.exe) return; spawn(e.exe, [], { cwd: path.dirname(e.exe), detached: true, stdio: 'ignore' }).unref(); });
+ipcMain.handle('launchEmu', (_, id) => { const e = config.emulators[id]; if (!e?.exe) return; launchBare(e.exe); });
 ipcMain.handle('addRomDir', async (_, { dir, system }) => { config.romDirs.push({ path: dir, system: system || null }); saveConfig(); return scanLibrary(); });
 ipcMain.handle('removeRomDir', async (_, dir) => { config.romDirs = config.romDirs.filter(r => r.path !== dir); saveConfig(); return scanLibrary(); });
 ipcMain.handle('setPref', (_, kv) => { Object.assign(config, kv); saveConfig(); });
 ipcMain.handle('setGame', (_, { id, patch }) => { Object.assign(library.games[id], patch); saveLibrary(); return library.games[id]; });
 ipcMain.handle('pickFolder', async () => { const r = await dialog.showOpenDialog(win, { properties: ['openDirectory'] }); return r.canceled ? null : r.filePaths[0]; });
-ipcMain.handle('pickExe', async () => { const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: [{ name: 'Programs', extensions: ['exe'] }] }); return r.canceled ? null : r.filePaths[0]; });
+ipcMain.handle('pickExe', async () => { const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: plat.OS === 'win' ? [{ name: 'Programs', extensions: ['exe'] }] : [] }); return r.canceled ? null : r.filePaths[0]; });
 ipcMain.handle('showInFolder', (_, p) => shell.showItemInFolder(p));
 ipcMain.handle('fullscreen', (_, on) => win.setFullScreen(on));
 ipcMain.handle('root', () => ROOT);

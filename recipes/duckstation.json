@@ -4,11 +4,19 @@
   "systems": [
     "ps1"
   ],
-  "exe": [
-    "duckstation-qt-x64-ReleaseLTCG.exe",
-    "duckstation-qt*.exe",
-    "duckstation*.exe"
-  ],
+  "exe": {
+    "win": [
+      "duckstation-qt-x64-ReleaseLTCG.exe",
+      "duckstation-qt*.exe",
+      "duckstation*.exe"
+    ],
+    "linux": [
+      "duckstation-qt",
+      "DuckStation*.AppImage",
+      "duckstation*.AppImage"
+    ]
+  },
+  "flatpak": "org.duckstation.DuckStation",
   "extensions": {
     "ps1": [
       ".cue",
@@ -28,22 +36,32 @@
       "{rom}"
     ]
   },
-  "dataDirs": [
-    "{exe}/portable.txt?{exe}",
-    "{docs}/DuckStation"
-  ],
+  "dataDirs": {
+    "win": [
+      "{exe}/portable.txt?{exe}",
+      "{docs}/DuckStation"
+    ],
+    "linux": [
+      "{exe}/portable.txt?{exe}",
+      "{xdg_data}/duckstation",
+      "{home}/.config/duckstation",
+      "{var}/config/duckstation"
+    ]
+  },
   "saves": {
     "ps1": "{data}/memcards"
   },
   "states": {
     "ps1": "{data}/savestates"
   },
+  "bios": [
+    "{data}/bios"
+  ],
   "source": {
     "url": "https://github.com/stenzek/duckstation/blob/master/src/duckstation-qt/qthost.cpp",
     "checked": "2026-09-01",
-    "note": "-batch exits after power off, -fullscreen, -nogui, -fastboot, -bigpicture"
-  },
-  "bios": [
-    "{data}/bios"
-  ]
+    "note": "-batch exits after power off, -fullscreen, -nogui, -fastboot, -bigpicture",
+    "linux": "src/core/core.cpp: portable.txt -> exe dir, else $XDG_CONFIG_HOME/duckstation if XDG_CONFIG_HOME is set, else ~/.local/share/duckstation. flatpak sets XDG_CONFIG_HOME=~/.var/app/<id>/config. flathub manifest grants NO filesystem access, REPRO passes --filesystem at launch",
+    "linuxChecked": "2026-10-06"
+  }
 }

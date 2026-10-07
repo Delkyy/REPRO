@@ -5,9 +5,17 @@
     "gc",
     "wii"
   ],
-  "exe": [
-    "Dolphin.exe"
-  ],
+  "exe": {
+    "win": [
+      "Dolphin.exe"
+    ],
+    "linux": [
+      "dolphin-emu",
+      "Dolphin*.AppImage",
+      "dolphin-emu*.AppImage"
+    ]
+  },
+  "flatpak": "org.DolphinEmu.dolphin-emu",
   "extensions": {
     "gc": [
       ".iso",
@@ -33,21 +41,31 @@
       "--exec={rom}"
     ]
   },
-  "dataDirs": [
-    "{exe}/User",
-    "{docs}/Dolphin Emulator",
-    "{appdata}/Dolphin Emulator"
-  ],
+  "dataDirs": {
+    "win": [
+      "{exe}/User",
+      "{docs}/Dolphin Emulator",
+      "{appdata}/Dolphin Emulator"
+    ],
+    "linux": [
+      "{exe}/portable.txt?{exe}/User",
+      "{home}/.dolphin-emu",
+      "{xdg_data}/dolphin-emu",
+      "{var}/data/dolphin-emu"
+    ]
+  },
   "saves": {
     "gc": "{data}/GC",
     "wii": "{data}/Wii/title"
   },
+  "bios": [
+    "{data}/Sys"
+  ],
   "source": {
     "url": "https://github.com/dolphin-emu/dolphin/blob/master/Readme.md",
     "checked": "2026-09-01",
-    "note": "-b/--batch runs without ui, requires --exec=<file>"
-  },
-  "bios": [
-    "{data}/Sys"
-  ]
+    "note": "-b/--batch runs without ui, requires --exec=<file>",
+    "linux": "Source/Core/UICommon/UICommon.cpp SetUserDirectory: portable.txt -> <exe>/User, else ~/.dolphin-emu if it exists, else $XDG_DATA_HOME/dolphin-emu (always XDG inside flatpak). flatpak: flathub org.DolphinEmu.dolphin-emu, command dolphin-emu-wrapper, filesystem=host:ro",
+    "linuxChecked": "2026-10-06"
+  }
 }

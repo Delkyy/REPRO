@@ -15,7 +15,7 @@ process.env.REPRO_ROOT = TMP;
 // minimal electron stub: just enough surface for main.js to load and register its handlers
 const noop = () => {};
 const electronStub = {
-  app: { isPackaged: false, whenReady: () => new Promise(noop), on: noop, getAppPath: () => REPO, getVersion: () => '0.0.0', quit: noop },
+  app: { isPackaged: false, whenReady: () => new Promise(noop), on: noop, getAppPath: () => REPO, getVersion: () => '0.0.0', quit: noop, commandLine: { appendSwitch: noop } },
   BrowserWindow: function () {},
   ipcMain: { handle: noop, on: noop },
   dialog: {}, shell: { openPath: noop }, Menu: { setApplicationMenu: noop, buildFromTemplate: () => ({}) },
@@ -65,6 +65,35 @@ test('every system and recipe has a logo in assets/systems', () => {
   const recipes = fs.readdirSync(path.join(REPO, 'recipes')).filter(f => f.endsWith('.json')).map(f => f.slice(0, -5));
   const missing = [...systems, ...recipes].filter(id => !fs.existsSync(path.join(REPO, 'assets', 'systems', id + '.svg')));
   assert.deepStrictEqual(missing, []);
+});
+
+test('recipes match emulator binaries on both oses, and flatpak handles', () => {
+  assert.strictEqual(M.recipeForExe('C:\\Emu\\Dolphin.exe', 'win')?.id, 'dolphin');
+  assert.strictEqual(M.recipeForExe('/usr/bin/dolphin-emu', 'linux')?.id, 'dolphin');
+  assert.strictEqual(M.recipeForExe('/home/d/Applications/DuckStation-x64.AppImage', 'linux')?.id, 'duckstation');
+  assert.strictEqual(M.recipeForExe('/usr/bin/pcsx2-qt', 'linux')?.id, 'pcsx2');
+  assert.strictEqual(M.recipeForExe('/usr/bin/dolphin-emu', 'win'), null, 'linux names do not match on windows');
+  assert.strictEqual(M.recipeForExe('flatpak:net.pcsx2.PCSX2')?.id, 'pcsx2');
+  assert.ok(M.isEmulatorFile('xemu.exe') && M.isEmulatorFile('xemu'), 'rom scan skips emulator folders from either os');
+});
+
+test('data dirs resolve per os: native xdg vs flatpak sandbox, never mixed', () => {
+  const home = path.join(TMP, 'fakehome');
+  const mk = p => { fs.mkdirSync(path.join(home, p), { recursive: true }); return path.join(home, p); };
+  const native = mk('.local/share/duckstation');
+  const sandbox = mk('.var/app/org.duckstation.DuckStation/config/duckstation');
+  const opts = { osId: 'linux', env: {}, home };
+  assert.strictEqual(M.resolveDataDir(M.recipes.duckstation, '/usr/bin/duckstation-qt', opts), native);
+  assert.strictEqual(M.resolveDataDir(M.recipes.duckstation, 'flatpak:org.duckstation.DuckStation', opts), sandbox);
+  // dolphin prefers legacy ~/.dolphin-emu when it exists (UICommon.cpp), else XDG
+  const xdgDolphin = mk('.local/share/dolphin-emu');
+  assert.strictEqual(M.resolveDataDir(M.recipes.dolphin, '/usr/bin/dolphin-emu', opts), xdgDolphin);
+  const legacy = mk('.dolphin-emu');
+  assert.strictEqual(M.resolveDataDir(M.recipes.dolphin, '/usr/bin/dolphin-emu', opts), legacy);
+  // windows: {appdata} from env
+  const appdata = mk('AppData/Roaming');
+  const xemuWin = mk('AppData/Roaming/xemu/xemu');
+  assert.strictEqual(M.resolveDataDir(M.recipes.xemu, 'C:\\xemu\\xemu.exe', { osId: 'win', env: { APPDATA: appdata }, home }), xemuWin);
 });
 
 test.after(() => fs.rmSync(TMP, { recursive: true, force: true }));

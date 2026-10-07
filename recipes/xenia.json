@@ -4,10 +4,12 @@
   "systems": [
     "x360"
   ],
-  "exe": [
-    "xenia.exe",
-    "xenia_canary.exe"
-  ],
+  "exe": {
+    "win": [
+      "xenia.exe",
+      "xenia_canary.exe"
+    ]
+  },
   "extensions": {
     "x360": [
       ".iso",
@@ -21,17 +23,20 @@
       "{rom}"
     ]
   },
-  "dataDirs": [
-    "{exe}/portable.txt?{exe}",
-    "{docs}/xenia"
-  ],
+  "dataDirs": {
+    "win": [
+      "{exe}/portable.txt?{exe}",
+      "{docs}/xenia"
+    ]
+  },
   "saves": {
     "x360": "{data}/content"
   },
+  "bios": [],
   "source": {
     "url": "https://github.com/xenia-project/xenia/blob/master/src/xenia/app/emulator_window.cc",
     "checked": "2026-09-01",
-    "note": "DEFINE_bool(fullscreen) in emulator_window.cc; positional 'target' in xenia_main.cc"
-  },
-  "bios": []
+    "note": "DEFINE_bool(fullscreen) in emulator_window.cc; positional 'target' in xenia_main.cc",
+    "linux": "no official linux build of xenia canary that runs 360 games reliably as of 2026-10; windows only (runs under proton/wine if you insist)"
+  }
 }

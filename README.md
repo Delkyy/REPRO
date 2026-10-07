@@ -2,7 +2,8 @@
 
 an emulator hub that actually does what you want. one folder, every emulator, every game, every save.
 
-![screenshot](docs/screenshot.png)
+![desktop mode](docs/shots/desktop.png)
+![couch mode](docs/shots/couch.png)
 
 ## what it does
 
@@ -12,10 +13,16 @@ an emulator hub that actually does what you want. one folder, every emulator, ev
 - pulls box art and descriptions from IGDB so your library looks like a library.
 - couch mode for the TV, desktop mode for the PC. controller-navigated with a guide overlay (like the xbox button).
 - portable. the whole thing runs from one folder. copy it anywhere, it works.
+- windows and linux. native installs, AppImages and flatpaks all get detected.
 
 ## setup
 
-download the latest portable exe from [releases](../../releases). drop it somewhere, run it.
+download from [releases](../../releases):
+
+- **windows**: `REPRO-x.y.z-portable.exe`. drop it in a folder, run it.
+- **linux**: `REPRO-x.y.z-x86_64.AppImage`. drop it in a folder, `chmod +x`, run it.
+
+either way, config, library, art and saves live in the folder next to it.
 
 on first launch it'll scan for emulators and ask where your roms are. or hit **File → Scan whole PC** and let it find everything itself.
 
@@ -25,19 +32,31 @@ for box art, grab a free Twitch developer key at [dev.twitch.tv](https://dev.twi
 
 works with any emulator via recipe files. ships with:
 
-| system | emulator |
-|--------|----------|
-| GameCube / Wii | Dolphin |
-| PS1 | DuckStation |
-| PS2 | PCSX2 |
-| Xbox | xemu |
-| Xbox 360 | Xenia |
+| system | emulator | windows | linux |
+|--------|----------|---------|-------|
+| GameCube / Wii | Dolphin | ✓ | ✓ native, AppImage, flatpak |
+| PS1 | DuckStation | ✓ | ✓ AppImage, flatpak |
+| PS2 | PCSX2 | ✓ | ✓ native, AppImage, flatpak |
+| Xbox | xemu | ✓ | ✓ native, AppImage, flatpak |
+| Xbox 360 | Xenia | ✓ | — (no native build) |
+
+on linux REPRO looks on your PATH, in `~/Applications`, `~/Games`, `/opt`, and in installed flatpaks. flatpak emulators get the rom folder and REPRO's saves folder passed into their sandbox at launch, so you don't need Flatseal.
 
 add more by dropping a `.json` recipe in the `recipes/` folder.
 
 ## adding your own emulator
 
-copy any existing file in `recipes/` and fill in the exe name and launch args. that's it.
+copy any existing file in `recipes/` and fill in the binary names (per os: `"exe": { "win": [...], "linux": [...] }`), the flatpak id if there is one, and the launch args. that's it.
+
+## development
+
+```
+npm i
+npm start           # run from source
+npm test            # node --test, no display needed
+npm run dist        # windows portable exe
+npm run dist:linux  # linux AppImage
+```
 
 ## themes
 

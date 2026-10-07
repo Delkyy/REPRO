@@ -4,9 +4,16 @@
   "systems": [
     "xbox"
   ],
-  "exe": [
-    "xemu.exe"
-  ],
+  "exe": {
+    "win": [
+      "xemu.exe"
+    ],
+    "linux": [
+      "xemu",
+      "xemu*.AppImage"
+    ]
+  },
+  "flatpak": "app.xemu.xemu",
   "extensions": {
     "xbox": [
       ".iso",
@@ -20,17 +27,26 @@
       "{rom}"
     ]
   },
-  "dataDirs": [
-    "{exe}/xemu.toml?{exe}",
-    "{appdata}/xemu/xemu"
-  ],
+  "dataDirs": {
+    "win": [
+      "{exe}/xemu.toml?{exe}",
+      "{appdata}/xemu/xemu"
+    ],
+    "linux": [
+      "{exe}/xemu.toml?{exe}",
+      "{xdg_data}/xemu/xemu",
+      "{var}/data/xemu/xemu"
+    ]
+  },
   "saves": {
     "xbox": "hdd-image"
   },
+  "bios": [],
   "source": {
     "url": "https://github.com/xemu-project/xemu/blob/master/system/vl.c",
     "checked": "2026-09-01",
-    "note": "-dvd_path <iso> parsed in vl.c; -full-screen is the qemu option in qemu-options.hx. saves live inside the hdd qcow2, path in xemu.toml sys.files.hdd_path"
-  },
-  "bios": []
+    "note": "-dvd_path <iso> parsed in vl.c; -full-screen is the qemu option in qemu-options.hx. saves live inside the hdd qcow2, path in xemu.toml sys.files.hdd_path",
+    "linux": "ui/xemu-settings.cc: xemu.toml next to the binary = portable, else SDL_GetPrefPath(\"xemu\",\"xemu\") = $XDG_DATA_HOME/xemu/xemu. flathub app.xemu.xemu, filesystem=host:ro",
+    "linuxChecked": "2026-10-06"
+  }
 }

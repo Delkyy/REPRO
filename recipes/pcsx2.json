@@ -4,11 +4,18 @@
   "systems": [
     "ps2"
   ],
-  "exe": [
-    "pcsx2-qt.exe",
-    "pcsx2-qtx64*.exe",
-    "pcsx2*.exe"
-  ],
+  "exe": {
+    "win": [
+      "pcsx2-qt.exe",
+      "pcsx2-qtx64*.exe",
+      "pcsx2*.exe"
+    ],
+    "linux": [
+      "pcsx2-qt",
+      "pcsx2*.AppImage"
+    ]
+  },
+  "flatpak": "net.pcsx2.PCSX2",
   "extensions": {
     "ps2": [
       ".iso",
@@ -27,22 +34,32 @@
       "{rom}"
     ]
   },
-  "dataDirs": [
-    "{exe}/portable.ini?{exe}",
-    "{docs}/PCSX2"
-  ],
+  "dataDirs": {
+    "win": [
+      "{exe}/portable.ini?{exe}",
+      "{docs}/PCSX2"
+    ],
+    "linux": [
+      "{exe}/portable.txt?{exe}",
+      "{exe}/portable.ini?{exe}",
+      "{xdg_config}/PCSX2",
+      "{var}/config/PCSX2"
+    ]
+  },
   "saves": {
     "ps2": "{data}/memcards"
   },
   "states": {
     "ps2": "{data}/sstates"
   },
+  "bios": [
+    "{data}/bios"
+  ],
   "source": {
     "url": "https://github.com/PCSX2/pcsx2/blob/master/pcsx2-qt/QtHost.cpp",
     "checked": "2026-09-01",
-    "note": "-batch exits after shutdown, -fullscreen, -nogui, -fastboot, -bigpicture"
-  },
-  "bios": [
-    "{data}/bios"
-  ]
+    "note": "-batch exits after shutdown, -fullscreen, -nogui, -fastboot, -bigpicture",
+    "linux": "pcsx2/Pcsx2Config.cpp SetAppRoot/DataRoot: portable.ini|txt -> exe dir, else $XDG_CONFIG_HOME/PCSX2 or ~/.config/PCSX2. flathub net.pcsx2.PCSX2, filesystem=host:ro",
+    "linuxChecked": "2026-10-06"
+  }
 }
