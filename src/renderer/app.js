@@ -92,32 +92,99 @@ function list() {
   else if (filter.startsWith('e:')) { const sysList = S.emulators[filter.slice(2)]?.systems || []; l = l.filter(g => sysList.includes(g.sys)); }
   return l.sort((a, b) => filter == 'recent' ? 0 : a.title.localeCompare(b.title));
 }
+// ---------- virtualized library: cards are packed into rows in js (widths come from each box's shape), and only
+// the rows near the viewport exist in the DOM. 11k cards used to mean 11k <img>s laid out on every click.
+const ROW_GAP = 16, COL_GAP = 14, LROW_H = 58, OVERSCAN = 2;
+let VL = null; // { l, rows: [{ top, h, items:[i...] }], height, mode, key }
+const cardDims = g => {
+  const ch = cardH(), ar = !g.art ? 0.8 : g.artKind === 'title' ? 0.8 : Math.min(1.5, Math.max(0.62, g.artAR || 0.72));
+  return { w: Math.round(ch * ar), h: ch + 22 };
+};
+const cardH = () => Math.round((parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cw')) || 150) * 1.3);
+function packRows(l, width, mode) {
+  const rows = []; let top = 0;
+  if (mode === 'list') { for (let i = 0; i < l.length; i++) rows.push({ top: i * LROW_H, h: LROW_H, items: [i] }); return { rows, height: l.length * LROW_H }; }
+  let cur = [], x = 0, h = 0;
+  const flush = () => { if (!cur.length) return; rows.push({ top, h, items: cur }); top += h + ROW_GAP; cur = []; x = 0; h = 0; };
+  for (let i = 0; i < l.length; i++) {
+    const d = cardDims(l[i]);
+    if (cur.length && x + d.w > width) flush();
+    cur.push(i); x += d.w + COL_GAP; h = Math.max(h, d.h);
+  }
+  flush();
+  return { rows, height: Math.max(0, top - ROW_GAP) };
+}
+function listRow(g) {
+  return `<div class="lrow ${sel == g.id ? 'sel' : ''}" data-id="${esc(g.id)}" ${sysc(g.sys)}>
+      <div class="th">${g.art ? `<img src="${fileUrl(g.art)}" loading="lazy" decoding="async">` : ''}</div>${logo(g.sys)}
+      <span class="t">${esc(g.title)}</span>${g.fav ? '<span class="fav">★</span>' : ''}<span class="m">${fmtPt(g.playtime)}</span></div>`;
+}
+function vlPaint(force) {
+  if (!VL) return;
+  const main = $('#main'), box = $('#items'); if (!box) return;
+  const off = box.offsetTop, vt = main.scrollTop - off, vb = vt + main.clientHeight;
+  // binary search the first row that ends below the viewport top
+  const R = VL.rows; let lo = 0, hi = R.length;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (R[m].top + R[m].h < vt) lo = m + 1; else hi = m; }
+  const first = Math.max(0, lo - OVERSCAN);
+  let last = lo; while (last < R.length && R[last].top < vb) last++;
+  last = Math.min(R.length, last + OVERSCAN);
+  const k = first + ':' + last;
+  if (!force && VL.painted === k) return;
+  VL.painted = k;
+  const html = [];
+  for (let r = first; r < last; r++) {
+    const row = R[r];
+    html.push(`<div class="vrow ${VL.mode}" style="top:${row.top}px;height:${row.h}px">${row.items.map(i => VL.mode === 'list' ? listRow(VL.l[i]) : shelfCard(VL.l[i])).join('')}</div>`);
+  }
+  box.innerHTML = html.join('');
+}
+function vlLayout(keepScroll) {
+  if (!VL) return;
+  const box = $('#items'); if (!box) return;
+  const width = box.clientWidth || 800;
+  if (VL.width === width && VL.ch === cardH() && !keepScroll?.force) return vlPaint();
+  Object.assign(VL, packRows(VL.l, width, VL.mode), { width, ch: cardH() });
+  box.style.height = VL.height + 'px';
+  vlPaint(true);
+}
 function renderMain() {
-  if (filter == 'unsorted') return renderUnsorted();
-  if (filter.startsWith('e:')) return renderEmu(filter.slice(2));
+  if (filter == 'unsorted') { VL = null; return renderUnsorted(); }
+  if (filter.startsWith('e:')) { VL = null; return renderEmu(filter.slice(2)); }
   const l = list();
   $('#count').textContent = `${l.length} / ${S.games.length}`;
-  if (!l.length) return renderEmpty();
+  if (!l.length) { VL = null; return renderEmpty(); }
   const names = { all: 'All games', fav: 'Favorites', recent: 'Continue' };
   const name = S.systems[filter] ? `${logo(filter)}${esc(sysName(filter))}` : names[filter] || (S.config.views || []).find(v => 'v:' + v.id == filter)?.name || filter;
   const sub = `${l.length} games` + (S.systems[filter] ? ` · ${esc(emuName(filter))}` : '');
-  $('#main').innerHTML = `<h2>${name}</h2><div class="sub">${sub}</div><div class="${view == 'list' ? 'list' : 'grid'}" id="items"></div>`;
-  const box = $('#items');
-  if (view == 'list') {
-    box.innerHTML = l.map(g => `<div class="lrow ${sel == g.id ? 'sel' : ''}" data-id="${esc(g.id)}" ${sysc(g.sys)}>
-      <div class="th">${g.art ? `<img src="${fileUrl(g.art)}">` : ''}</div>${logo(g.sys)}
-      <span class="t">${esc(g.title)}</span>${g.fav ? '<span class="fav">★</span>' : ''}<span class="m">${fmtPt(g.playtime)}</span></div>`).join('');
-  } else {
-    box.classList.add('shelfgrid');
-    box.innerHTML = l.map(shelfCard).join('');
+  const mode = view == 'list' ? 'list' : 'grid';
+  const key = filter + '|' + mode + '|' + ($('#q').value || '');
+  const main = $('#main');
+  // same shelf, just re-rendering (selection, fav...): keep the header + scroll position, repaint the visible rows
+  if (VL && VL.key === key && $('#items')) {
+    VL.l = l; $('#main .sub').innerHTML = sub;
+    if (VL.l.length !== VL.count) { VL.count = l.length; VL.width = 0; vlLayout(); } else vlPaint(true);
+    return;
   }
-  box.querySelectorAll('[data-id]').forEach(c => c.onclick = e => {
-    if (e.target.closest('[data-play]')) return launch(c.dataset.id);
-    if (e.target.closest('[data-scrape]')) { scrapeOne(c.dataset.id); return; }
-    sel = c.dataset.id; if (e.target.closest('[data-cog]')) window._openTab = 'launch';
-    renderMain(); renderDetail(); app.classList.remove('nodetail');
-  });
+  main.innerHTML = `<h2>${name}</h2><div class="sub">${sub}</div><div class="vlist ${mode == 'list' ? 'list' : 'grid shelfgrid'}" id="items"></div>`;
+  main.scrollTop = 0;
+  VL = { l, mode, key, count: l.length };
+  vlLayout();
 }
+// one delegated handler instead of one per card (cards come and go while scrolling)
+$('#main').addEventListener('click', e => {
+  const c = e.target.closest('#items [data-id]'); if (!c) return;
+  if (e.target.closest('[data-play]')) return launch(c.dataset.id);
+  if (e.target.closest('[data-scrape]')) { scrapeOne(c.dataset.id); return; }
+  const prev = sel; sel = c.dataset.id; if (e.target.closest('[data-cog]')) window._openTab = 'launch';
+  // flip the highlight in place, no re-render
+  if (prev) $('#items')?.querySelector(`[data-id="${CSS.escape(prev)}"]`)?.classList.remove('sel');
+  c.classList.add('sel');
+  renderDetail(); app.classList.remove('nodetail');
+});
+let vlRaf = 0;
+$('#main').addEventListener('scroll', () => { if (!vlRaf) vlRaf = requestAnimationFrame(() => { vlRaf = 0; vlPaint(); }); }, { passive: true });
+new ResizeObserver(() => { if (VL) { VL.width = 0; vlLayout(); } }).observe($('#main'));
 function renderEmpty() {
   const s = S.systems[filter];
   const emu = s ? emuFor(filter) : null;
@@ -421,7 +488,7 @@ $('#tDetail').onclick = () => setPanel('detail', app.classList.contains('nodetai
 $('#btnCouch').onclick = () => setMode('couch');
 $('#railAdd').onclick = async () => { const d = await repro.pickFolder(); if (d) { S = await repro.addRomDir({ dir: d }); toast(`added <b>${esc(d)}</b>`); renderAll(); } };
 $('#railSettings').onclick = openSettings;
-$('#zoom').oninput = e => document.documentElement.style.setProperty('--cw', e.target.value + 'px');
+$('#zoom').oninput = e => { document.documentElement.style.setProperty('--cw', e.target.value + 'px'); if (VL) { VL.width = 0; vlLayout(); } };
 $('#q').oninput = () => renderMain();
 $('#viewSeg').querySelectorAll('button').forEach(b => b.onclick = () => { view = b.dataset.v; $('#viewSeg').querySelectorAll('button').forEach(x => x.classList.toggle('on', x == b)); renderMain(); });
 document.querySelectorAll('.rail [data-f]').forEach(b => b.onclick = () => { filter = b.dataset.f; document.querySelectorAll('.rail [data-f]').forEach(x => x.classList.toggle('on', x == b)); renderSide(); renderMain(); });

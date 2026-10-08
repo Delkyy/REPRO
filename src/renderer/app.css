@@ -366,3 +366,8 @@ input[type=range]{accent-color:var(--accent)}
 .card.shelf .fav{top:28px}
 .card.shelf .badge{top:28px}
 .card.shelf .pb{bottom:0}
+/* virtualized library: #items is as tall as the whole shelf, only nearby rows exist, absolutely placed */
+#items.vlist{position:relative;display:block}
+#items.vlist .vrow{position:absolute;left:0;right:0;display:flex;align-items:flex-end;gap:14px}
+#items.vlist .vrow.list{align-items:stretch}
+#items.vlist .vrow.list .lrow{flex:1;height:58px;box-sizing:border-box}

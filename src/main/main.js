@@ -334,12 +334,19 @@ function emuFolders(id, e) {
   for (const b of r.bios || []) { const p = fill(b); if (fs.existsSync(p)) out.push({ label: 'bios', path: p }); }
   return out;
 }
+// what the renderer needs per game. bookkeeping (artFrom, artTried, variants list) stays in main: ~6.5MB -> ~4MB per refresh.
+const SLIM_DROP = new Set(['artFrom', 'artTried', 'variants']);
+function slimGame(g) {
+  const o = {}; for (const k in g) if (!SLIM_DROP.has(k) && g[k] != null) o[k] = g[k];
+  if (g.variants?.length) o.nVariants = g.variants.length;
+  return o;
+}
 function snapshot() {
   const emus = {};
   for (const [id, e] of Object.entries(config.emulators)) emus[id] = { ...e, name: recipes[id]?.name || id, systems: recipes[id]?.systems || [], exeDir: plat.programDir(e.exe), flatpak: plat.isFlatpak(e.exe), folders: emuFolders(id, e) };
   function readThemeDir(base) { try { return fs.readdirSync(base).filter(d => fs.existsSync(path.join(base, d, 'theme.json'))).map(d => ({ id: d, ...readJson(path.join(base, d, 'theme.json'), {}), base })); } catch { return []; } }
   const themes = [...readThemeDir(P.themes), ...(ROOT !== BUNDLE ? readThemeDir(path.join(ROOT, 'themes')) : [])].reduce((a, t) => { a[t.id] = t; return a; }, {});
-  return { games: Object.values(library.games), unsorted: library.unsorted || [], emulators: emus, systems: SYSTEMS, sysdb: SYSDB, root: ROOT, bundle: BUNDLE, themes: Object.values(themes), recipeArgs: Object.fromEntries(Object.entries(recipes).map(([k, r]) => [k, r.args])), os: plat.OS, config: { mode: config.mode, ui: config.ui, theme: config.theme, romDirs: config.romDirs, views: config.views || [], panels: config.panels || { side: true, detail: true }, cardSize: config.cardSize || 150, hubKey: config.hubKey || 'Ctrl+Alt+H', hubKeyOk: hubKeyOk } };
+  return { games: Object.values(library.games).map(slimGame), unsorted: library.unsorted || [], emulators: emus, systems: SYSTEMS, sysdb: SYSDB, root: ROOT, bundle: BUNDLE, themes: Object.values(themes), recipeArgs: Object.fromEntries(Object.entries(recipes).map(([k, r]) => [k, r.args])), os: plat.OS, config: { mode: config.mode, ui: config.ui, theme: config.theme, romDirs: config.romDirs, views: config.views || [], panels: config.panels || { side: true, detail: true }, cardSize: config.cardSize || 150, hubKey: config.hubKey || 'Ctrl+Alt+H', hubKeyOk: hubKeyOk } };
 }
 // duplicates: same title across different systems isn't a dupe, but same title+sys with a different path is
 function findDuplicates() {
