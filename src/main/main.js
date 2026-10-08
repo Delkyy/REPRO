@@ -1,5 +1,5 @@
 // REPRO main process: config, recipes, detect, scan, launch. plain node, no framework.
-const { app, BrowserWindow, ipcMain, dialog, shell, Menu, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu, globalShortcut, nativeImage } = require('electron');
 const fs = require('fs');
 const fsp = require('fs/promises');
 const path = require('path');
@@ -8,6 +8,7 @@ const { spawn } = require('child_process');
 const { scrapeLibrary, scrapeGame } = require('./scraper');
 const plat = require('./platform');
 const saves = require('./saves');
+const covers = require('./covers');
 
 // ---------- two roots: BUNDLE (packed read-only assets) and ROOT (user data next to the exe)
 // In dev both are the repo root. In the packaged portable exe they split:
@@ -298,6 +299,7 @@ async function scanLibrary() {
     games[pick.path] = { ...old, ...pick, id: pick.path, playtime: old.playtime || 0, lastPlayed: old.lastPlayed || null, fav: !!old.fav, art: old.art || findLocalArt(pick), ...(variants.length ? { variants } : { variants: undefined }) };
   }
   library.games = games; library.unsorted = unsorted; saveLibrary();
+  if (app.isReady?.() && !process.env.REPRO_NO_COVERS) setTimeout(() => startCovers(), 1500); // background, never blocks the scan
   return snapshot();
 }
 // lower is better: USA/World first (60Hz, english), then Europe, then Japan; verified dumps over revisions/betas/hacks
@@ -366,6 +368,42 @@ function saveCtx(g) {
 function safeSnapshot(g, opts) { try { return saves.snapshot(ROOT, saveCtx(g), opts); } catch (e) { console.warn('[saves]', g.title, e.message); return { error: e.message }; } }
 
 // ---------- launch
+// ---------- covers: real box art from libretro-thumbnails, bar color + box shape pulled from each cover
+const IMG = {
+  decode(buf) {
+    const im = nativeImage.createFromBuffer(buf); if (im.isEmpty()) return null;
+    const { width: w, height: h } = im.getSize();
+    return {
+      w, h,
+      jpeg: maxH => (h > maxH ? im.resize({ height: maxH, quality: 'best' }) : im).toJPEG(85),
+      bitmap: side => { const r = im.resize(w >= h ? { width: side } : { height: side }); const sz = r.getSize(); return { data: r.toBitmap(), w: sz.width, h: sz.height }; },
+    };
+  },
+};
+let coverJob = null;
+function applyCover(g, r) {
+  const L = library.games[g.id]; if (!L) return;
+  if (r) Object.assign(L, r, { artTried: Date.now() });
+  else L.artTried = Date.now();
+}
+// games that still need a cover: no art, or a previous miss older than a week (the CDN keeps growing)
+const needsCover = g => !g.art && (!g.artTried || Date.now() - g.artTried > 7 * 24 * 3600e3);
+function startCovers({ force = false } = {}) {
+  if (coverJob) return { running: true };
+  // art that came from somewhere else (IGDB, user files) still gets a bar color + shape
+  for (const g of Object.values(library.games)) if (g.art && !g.artColor && fs.existsSync(g.art)) Object.assign(g, covers.describeLocal(g.art, IMG) || {});
+  const todo = Object.values(library.games).filter(g => covers.LR_SYSTEM[g.sys] && (force ? !g.art || g.artKind === 'title' : needsCover(g)));
+  if (!todo.length) { saveLibrary(); return { ok: true, total: 0 }; }
+  let got = 0, last = 0;
+  coverJob = covers.coverAll(todo, { artDir: P.art, cacheDir: path.join(P.art, '.index'), img: IMG, concurrency: 6 }, (g, r, done, total) => {
+    applyCover(g, r); if (r) got++;
+    if (done === total || Date.now() - last > 700) { last = Date.now(); send('covers-progress', { done, total, got, title: g.title }); }
+    if (done % 200 === 0) saveLibrary();
+  });
+  coverJob.done.then(() => { saveLibrary(); coverJob = null; send('covers-progress', { done: todo.length, total: todo.length, got, finished: true }); });
+  return { ok: true, total: todo.length };
+}
+
 let running = null;
 function launchBare(exe) { const c = plat.spawnEmu(exe, [], { spawn: { detached: true } }); c.on('error', err => send('menu', 'toast', 'launch failed: ' + err.message)); c.unref(); }
 function emulatorFor(sys) {
@@ -517,10 +555,12 @@ if (plat.OS === 'linux') app.commandLine.appendSwitch('enable-features', 'Global
 app.whenReady().then(() => { if (!process.argv.includes('--smoke')) { createWindow(); startGuideHook(); } });
 app.on('window-all-closed', () => app.quit());
 app.on('will-quit', () => { globalShortcut.unregisterAll(); stopGuideHook(); });
-module.exports = { library, saveCtx, launch, killRunning, detectEmulators, scanLibrary, snapshot, config, saveConfig, recipes, resolveDataDir, recipeForExe, isEmulatorFile, ROOT };
+module.exports = { startCovers, IMG, library, saveCtx, launch, killRunning, detectEmulators, scanLibrary, snapshot, config, saveConfig, recipes, resolveDataDir, recipeForExe, isEmulatorFile, ROOT };
 
 // ---------- ipc
 ipcMain.handle('snapshot', () => snapshot());
+ipcMain.handle('covers', (_, o) => startCovers(o || {}));
+ipcMain.handle('coversStop', () => { coverJob?.stop(); return { ok: true }; });
 ipcMain.handle('detect', async () => detectEmulators());
 ipcMain.handle('scan', async () => scanLibrary());
 ipcMain.handle('launch', (_, id) => launch(id));
@@ -600,7 +640,7 @@ ipcMain.handle('scrapeAll', async (_, { clientId, clientSecret } = {}) => {
   try {
     const results = await scrapeLibrary(games, P.art, creds, (i, total, g, r) => {
       done = i;
-      if (r.artPath) { library.games[g.id].art = r.artPath; found++; }
+      if (r.artPath) { Object.assign(library.games[g.id], { art: r.artPath, artKind: 'box' }, covers.describeLocal(r.artPath, IMG) || {}); found++; }
       if (r.desc) library.games[g.id].desc = r.desc;
       if (r.year) library.games[g.id].year = r.year;
       if (r.genres?.length) library.games[g.id].genres = r.genres;
@@ -619,7 +659,7 @@ ipcMain.handle('scrapeOne', async (_, gameId) => {
   const artDir = path.join(P.art, g.sys);
   const creds = config.igdb?.clientId ? config.igdb : null;
   const r = await scrapeGame(g, artDir, creds);
-  if (r.artPath) library.games[g.id].art = r.artPath;
+  if (r.artPath) Object.assign(library.games[g.id], { art: r.artPath, artKind: 'box' }, covers.describeLocal(r.artPath, IMG) || {});
   if (r.desc) library.games[g.id].desc = r.desc;
   if (r.year) library.games[g.id].year = r.year;
   if (r.genres?.length) library.games[g.id].genres = r.genres;

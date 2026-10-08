@@ -14,6 +14,8 @@ contextBridge.exposeInMainWorld('repro', {
   scrapeAll: call('scrapeAll'), scrapeOne: call('scrapeOne'),
   setIgdb: call('setIgdb'), generateM3u: call('generateM3u'), scrapeStatus: call('scrapeStatus'),
   onScrapeProgress: (fn) => ipcRenderer.on('scrape-progress', (_, d) => fn(d)),
+  covers: call('covers'), coversStop: call('coversStop'),
+  onCoversProgress: (fn) => ipcRenderer.on('covers-progress', (_, d) => fn(d)),
   autoScanRoms: call('autoScanRoms'), recoverPaths: call('recoverPaths'),
   onScanProgress: (fn) => ipcRenderer.on('scan-progress', (_, d) => fn(d)),
   onMenu: (fn) => ipcRenderer.on('menu', (_, cmd, arg) => fn(cmd, arg)),

@@ -20,6 +20,7 @@ const electronStub = {
   ipcMain: { handle: noop, on: noop },
   dialog: {}, shell: { openPath: noop }, Menu: { setApplicationMenu: noop, buildFromTemplate: () => ({}) },
   globalShortcut: { register: () => true, unregisterAll: noop },
+  nativeImage: { createFromBuffer: () => ({ isEmpty: () => true }) },
 };
 const origLoad = Module._load;
 Module._load = function (req, ...rest) { return req === 'electron' ? electronStub : origLoad.call(this, req, ...rest); };

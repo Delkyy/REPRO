@@ -21,6 +21,25 @@ const played = () => S.games.filter(g => g.lastPlayed).sort((a, b) => b.lastPlay
 let tt; function toast(h) { const t = $('#toast'); t.innerHTML = h; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 3000); }
 
 function artEl(g) { return g.art ? `<img src="${fileUrl(g.art)}" alt="">` : `<div class="noart">${logo(g.sys)}${esc(g.title)}<small>no art yet</small></div>`; }
+// ---------- shelf cards: store top bar colored from the cover, card shaped like the real box
+const SHORT = { nes: 'NES', snes: 'SNES', n64: 'N64', gc: 'GAMECUBE', wii: 'WII', wiiu: 'WII U', switch: 'SWITCH', gb: 'GAME BOY', gbc: 'GB COLOR', gba: 'GBA', ds: 'DS', '3ds': '3DS', ps1: 'PS1', ps2: 'PS2', ps3: 'PS3', ps4: 'PS4', ps5: 'PS5', psp: 'PSP', vita: 'VITA', xbox: 'XBOX', x360: 'XBOX 360', xone: 'XBOX ONE', xsx: 'SERIES X|S', genesis: 'GENESIS', sms: 'MASTER SYS', gg: 'GAME GEAR', segacd: 'SEGA CD', '32x': '32X', saturn: 'SATURN', dc: 'DREAMCAST', tg16: 'TG-16', atari2600: '2600', arcade: 'ARCADE', pc: 'PC' };
+const REGION = f => { const m = (f || '').match(/\((USA|World|Europe|Japan)[,)]/i) || (f || '').match(/\((?:[^()]*, )?(USA|Europe|Japan)\)/i); return m ? ({ usa: 'USA', world: 'WORLD', europe: 'EUR', japan: 'JPN' })[m[1].toLowerCase()] : ''; };
+function barEl(g) {
+  const right = g.year || REGION(g.file);
+  return `<div class="cbar"><i class="lg" style="--m:url('${fileUrl(BUNDLE + '/assets/systems/' + g.sys + '.svg')}')"></i><b>${SHORT[g.sys] || esc(sysName(g.sys)).toUpperCase()}</b>${right ? `<span>${esc(String(right))}</span>` : ''}</div>`;
+}
+function shelfCard(g) {
+  const kind = !g.art ? 'none' : g.artKind === 'title' ? 'title' : 'box';
+  // box keeps its real shape (clamped so a weird scan can't make a 3-wide card); title screens + no-art share one shape
+  const ar = kind === 'box' ? Math.min(1.5, Math.max(0.62, g.artAR || 0.72)) : 0.8;
+  const vars = `--ar:${ar};--bc:${g.artColor || sysColor(g.sys) || '#2a2a30'};--bi:${g.artInk || '#fff'};--sysc:${sysColor(g.sys) || 'var(--accent)'}`;
+  const body = kind === 'box' ? `<img src="${fileUrl(g.art)}" alt="" loading="lazy" decoding="async">`
+    : kind === 'title' ? `<div class="ts"><img src="${fileUrl(g.art)}" alt="" loading="lazy" decoding="async"></div><div class="tl">${esc(g.title)}</div>`
+    : `<div class="na"><b>${esc(g.title)}</b></div>`;
+  return `<div class="card shelf k-${kind} ${sel == g.id ? 'sel' : ''}" data-id="${esc(g.id)}" style="${vars}">${barEl(g)}<div class="cart">${body}</div>${g.fav ? '<span class="fav">★</span>' : ''}${g.emulator ? '<span class="badge">ALT EMU</span>' : ''}
+      ${g.playtime ? `<div class="pb"><i style="width:${Math.min(100, g.playtime / 36)}%"></i></div>` : ''}
+      <div class="over"><b>${esc(g.title)}</b><div class="acts"><button class="p" data-play="${esc(g.id)}">▶ Play</button><button class="cog" data-cog="${esc(g.id)}" title="settings">⚙</button></div></div></div>`;
+}
 
 /* ---------- saved views: {id,name,filter:{sys,fav,q}} ---------- */
 function matchView(g, v) { if (v.sys && g.sys !== v.sys) return false; if (v.fav && !g.fav) return false; if (v.q && !g.title.toLowerCase().includes(v.q.toLowerCase())) return false; return true; }
@@ -89,10 +108,8 @@ function renderMain() {
       <div class="th">${g.art ? `<img src="${fileUrl(g.art)}">` : ''}</div>${logo(g.sys)}
       <span class="t">${esc(g.title)}</span>${g.fav ? '<span class="fav">★</span>' : ''}<span class="m">${fmtPt(g.playtime)}</span></div>`).join('');
   } else {
-    box.innerHTML = l.map(g => `<div class="card ${sel == g.id ? 'sel' : ''}" data-id="${esc(g.id)}" ${sysc(g.sys)}>
-      ${artEl(g)}${g.fav ? '<span class="fav">★</span>' : ''}${g.emulator ? '<span class="badge">ALT EMU</span>' : ''}
-      ${g.playtime ? `<div class="pb"><i style="width:${Math.min(100, g.playtime / 36)}%"></i></div>` : ''}<div class="sysb"></div>
-      <div class="over"><b>${esc(g.title)}</b><div class="acts"><button class="p" data-play="${esc(g.id)}">▶ Play</button><button class="cog" data-cog="${esc(g.id)}" title="settings">⚙</button>${!g.art ? `<button class="cog" data-scrape="${esc(g.id)}" title="scrape art">🖼</button>` : ''}</div></div></div>`).join('');
+    box.classList.add('shelfgrid');
+    box.innerHTML = l.map(shelfCard).join('');
   }
   box.querySelectorAll('[data-id]').forEach(c => c.onclick = e => {
     if (e.target.closest('[data-play]')) return launch(c.dataset.id);
@@ -248,6 +265,11 @@ async function scrapeOne(id) {
   toast(r.artPath ? `got art for <b>${esc(g.title)}</b>` : `no art found for <b>${esc(g.title)}</b> — try IGDB credentials in Settings`);
   renderAll();
 }
+let coverToastAt = 0;
+repro.onCoversProgress(async d => {
+  if (d.finished) { S = await repro.snapshot(); renderAll(); toast(`box art: <b>${d.got}</b> new covers`); return; }
+  if (Date.now() - coverToastAt > 4000) { coverToastAt = Date.now(); toast(`fetching box art… ${d.done}/${d.total} (${d.got} found)`); if (d.got && d.done % 600 < 40) { S = await repro.snapshot(); renderMain(); } }
+});
 repro.onGameExited(async ({ gameId, secs, saved }) => { await refresh(); const g = byId(gameId); toast(`back. <b>${esc(g?.title)}</b>, ${fmtPt(secs)} this session.${saved ? ' save snapshotted.' : ''}`); });
 
 /* ---------- couch mode (ported from sketch 001) ---------- */
@@ -668,6 +690,7 @@ async function refresh(showToast) {
   if (c.panels) { setPanel('side', c.panels.side !== false); setPanel('detail', c.panels.detail !== false); }
   if (c.cardSize) { $('#zoom').value = c.cardSize; document.documentElement.style.setProperty('--cw', c.cardSize + 'px'); }
   renderAll();
+  if (S.games.some(g => !g.art)) repro.covers(); // background; skips games it already tried this week
   if (c.mode == 'couch') setMode('couch');
   if (!S.games.length && !(c.romDirs || []).length) openSettings();
 })();
