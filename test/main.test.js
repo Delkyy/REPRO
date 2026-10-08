@@ -96,4 +96,11 @@ test('data dirs resolve per os: native xdg vs flatpak sandbox, never mixed', () 
   assert.strictEqual(M.resolveDataDir(M.recipes.xemu, 'C:\\xemu\\xemu.exe', { osId: 'win', env: { APPDATA: appdata }, home }), xemuWin);
 });
 
+test('every source file parses (renderer included: a syntax error there blanks the whole UI)', () => {
+  const { execFileSync } = require('child_process');
+  const files = ['src/main', 'src/renderer'].flatMap(d => fs.readdirSync(path.join(REPO, d)).filter(f => f.endsWith('.js')).map(f => path.join(REPO, d, f)));
+  for (const f of files) execFileSync(process.execPath, ['--check', f], { stdio: 'pipe' });
+  assert.ok(files.some(f => f.endsWith('app.js')));
+});
+
 test.after(() => fs.rmSync(TMP, { recursive: true, force: true }));

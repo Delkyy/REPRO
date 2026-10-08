@@ -340,3 +340,9 @@ input[type=range]{accent-color:var(--accent)}
 .guide .slots-mini .sm.act{border-color:var(--accent);color:var(--accent)}
 .guide .hints{display:flex;gap:calc(18px*var(--u,1));flex-wrap:wrap;margin-top:calc(16px*var(--u,1));padding-top:calc(12px*var(--u,1));border-top:1px solid var(--line);font-size:calc(11px*var(--u,1));color:var(--muted)}
 .guide .hints .b{display:inline-grid;place-items:center;width:calc(18px*var(--u,1));height:calc(18px*var(--u,1));border-radius:50%;border:1.5px solid var(--muted);font-weight:800;font-size:calc(9px*var(--u,1));margin-right:4px;color:var(--fg)}
+/* saves tab */
+.slot.live{border-color:color-mix(in srgb,var(--accent2) 35%,var(--line))}
+.slot .sh.kind-manual{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
+.slot .sh.kind-safety{color:var(--accent2)}
+.slot .sh.kind-auto{color:var(--muted)}
+#savesPane button[disabled]{opacity:.4;cursor:default}

@@ -7,6 +7,7 @@ const os = require('os');
 const { spawn } = require('child_process');
 const { scrapeLibrary, scrapeGame } = require('./scraper');
 const plat = require('./platform');
+const saves = require('./saves');
 
 // ---------- two roots: BUNDLE (packed read-only assets) and ROOT (user data next to the exe)
 // In dev both are the repo root. In the packaged portable exe they split:
@@ -303,158 +304,26 @@ function findDuplicates() {
 
 
 // ============================
-// SAVES (M2) — shared save folder, per-game organisation
-// saves/<sys>/<safeTitle>/active.<ext>  — live card, emulator always points here
-// saves/<sys>/<safeTitle>/auto-<date>.<ext> — snapshot before each launch (kept: last 10)
-// saves/<sys>/<safeTitle>/slot-<name>.<ext> — user-named slots
-// xemu is special: its hdd is a 4GB qcow2; we snapshot it only if newer on exit
+// SAVES: real per-emulator adapters live in saves.js. REPRO reads where each emulator actually keeps its saves
+// and snapshots those files; it does NOT rewrite emulator configs (the old ini patching did, and pointed PCSX2 at
+// an empty folder, hiding the user's existing memory cards).
 // ============================
-const SAVE_EXT = { gc:'raw', wii:'raw', ps1:'mcd', ps2:'ps2', ps3:'ps3', xbox:'qcow2', x360:'sav', psp:'mcd', psp2:'vmc', generic:'sav' };
 const SAVE_DIR = path.join(ROOT, 'saves');
-function safeName(s){ return s.replace(/[<>:"/\|?* -]/g,'_').replace(/\.+$/,'').slice(0,60); }
-function getSaveDir(g){ return path.join(SAVE_DIR, g.sys, safeName(g.title)); }
-function getSaveExt(g){ return SAVE_EXT[g.sys] || SAVE_EXT.generic; }
-function activeSave(g){ return path.join(getSaveDir(g), 'active.' + getSaveExt(g)); }
-
-// xemu HDD path from config
-function xemuHddPath(){ const e = config.emulators.xemu; if (!e?.dataDir) return null; const tf = path.join(e.dataDir,'xemu.toml'); if (!fs.existsSync(tf)) return null; try { const t=fs.readFileSync(tf,'utf8'); const m=t.match(/hdd_path\s*=\s*"([^"]+)"/); return m?m[1]:null; } catch{ return null; } }
-
-// snapshot: copy active save to a dated slot (trim older than 10)
-function snapshotSave(g) {
-  const dir = getSaveDir(g);
-  if (g.sys === 'xbox') { return snapshotXemu(g); }  // handled separately
-  const src = activeSave(g);
-  if (!fs.existsSync(src)) return null;
-  fs.mkdirSync(dir, { recursive: true });
-  const stamp = new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
-  const dst = path.join(dir, 'auto-' + stamp + '.' + getSaveExt(g));
-  fs.copyFileSync(src, dst);
-  // trim to 10 auto snapshots
-  const autos = fs.readdirSync(dir).filter(f=>f.startsWith('auto-')).sort();
-  for (const f of autos.slice(0, Math.max(0, autos.length - 10))) fs.unlinkSync(path.join(dir, f));
-  return dst;
+// which emulator would run this game: per-game override first, then the system default
+function emuIdFor(g) { if (g.emulator && config.emulators[g.emulator]?.exe) return g.emulator; for (const [id, e] of Object.entries(config.emulators)) if (recipes[id]?.systems.includes(g.sys) && e.exe) return id; return null; }
+function saveCtx(g) {
+  const emulator = emuIdFor(g);
+  const e = emulator ? config.emulators[emulator] : null;
+  // dataDir can appear after setup (emulator first run creates it), so re-resolve when it's missing
+  let dataDir = e?.dataDir || null;
+  if (e && (!dataDir || !fs.existsSync(dataDir))) { dataDir = resolveDataDir(recipes[emulator], e.exe); if (dataDir) { e.dataDir = dataDir; saveConfig(); } }
+  return { game: g, emulator, dataDir };
 }
-function snapshotXemu(g) {
-  const hdd = xemuHddPath(); if (!hdd || !fs.existsSync(hdd)) return null;
-  const dir = getSaveDir(g); fs.mkdirSync(dir, { recursive: true });
-  const stamp = new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
-  const dst = path.join(dir, 'auto-' + stamp + '.qcow2');
-  try { fs.copyFileSync(hdd, dst); } catch(e){ return null; }
-  const autos = fs.readdirSync(dir).filter(f=>f.startsWith('auto-')).sort();
-  for (const f of autos.slice(0, Math.max(0, autos.length - 5))) fs.unlinkSync(path.join(dir, f)); // 5 for xemu, they're huge
-  return dst;
-}
+function safeSnapshot(g, opts) { try { return saves.snapshot(ROOT, saveCtx(g), opts); } catch (e) { console.warn('[saves]', g.title, e.message); return { error: e.message }; } }
 
-// restore: copy a named slot back to active
-function restoreSave(g, slotFile) {
-  const dir = getSaveDir(g);
-  const src = path.join(dir, slotFile);
-  if (!fs.existsSync(src)) return { error: 'slot file not found' };
-  if (g.sys === 'xbox') { const hdd = xemuHddPath(); if (!hdd) return { error: 'xemu hdd path not found' }; fs.copyFileSync(src, hdd); return { ok: true }; }
-  // backup active before restoring
-  const act = activeSave(g);
-  if (fs.existsSync(act)) { fs.copyFileSync(act, act + '.bak'); }
-  fs.copyFileSync(src, act);
-  return { ok: true };
-}
-
-// list slots for a game
-function listSlots(g) {
-  const dir = getSaveDir(g);
-  if (!fs.existsSync(dir)) return [];
-  const files = fs.readdirSync(dir).filter(f => !f.endsWith('.bak'));
-  return files.map(f => {
-    const st = fs.statSync(path.join(dir, f));
-    return { file: f, size: st.size, mtime: st.mtimeMs, isActive: f.startsWith('active.'), isAuto: f.startsWith('auto-') };
-  }).sort((a,b) => b.mtime - a.mtime);
-}
-
-// rename a slot
-function renameSlot(g, from, to) {
-  const dir = getSaveDir(g);
-  const ext = path.extname(from);
-  const newName = to.replace(/[<>:"/\|?* -]/g,'_') + ext;
-  if (from === newName) return { ok: true };
-  fs.renameSync(path.join(dir, from), path.join(dir, newName));
-  return { ok: true, newFile: newName };
-}
-
-// delete a slot
-function deleteSlot(g, file) {
-  if (file.startsWith('active.')) return { error: "can't delete the active save" };
-  const p = path.join(getSaveDir(g), file);
-  if (!fs.existsSync(p)) return { error: 'not found' };
-  fs.unlinkSync(p);
-  return { ok: true };
-}
-
-// prepare: point the emulator at our managed save dir.
-// For ps1/ps2: overwrite the emulator's memcard path with active.mcd / active.ps2
-// For gc: overwrite the Dolphin GC card path with active.raw
-// For xemu: we DON'T move the HDD — it's already in place; we just snapshot before launch
-// For other systems: no managed card yet, fallback to emulator's own default
-function prepareSave(g) {
-  const dir = getSaveDir(g); fs.mkdirSync(dir, { recursive: true });
-  const act = activeSave(g);
-  // if no active save yet, create a blank one so the emulator doesn't start confused
-  if (!fs.existsSync(act) && g.sys !== 'xbox') { fs.writeFileSync(act, Buffer.alloc(128*1024)); } // 128KB blank
-  return { saveDir: dir, activePath: act };
-}
-
-
-// ---- configure emulator memcard dirs to point at REPRO saves folder ----
-// Called once when an emulator is added/configured, and on first launch.
-// Sources:
-//   DuckStation ini keys: github.com/stenzek/duckstation/blob/master/src/core/settings.cpp
-//   PCSX2 ini keys: Documents/PCSX2/inis/PCSX2.ini [Folders] MemoryCards, [EmuCore] McdFolderAutoManage
-function patchEmulatorMemcardDir(id, e) {
-  const r = recipes[id]; if (!r || !e?.dataDir) return;
-  if (id === 'duckstation') {
-    const ini = path.join(e.dataDir, 'settings.ini');
-    if (!fs.existsSync(ini)) return;
-    let s = fs.readFileSync(ini, 'utf8');
-    const saveDir = path.join(SAVE_DIR, 'ps1');
-    fs.mkdirSync(saveDir, { recursive: true });
-    // Set Card1Type to PerGameTitle so each game gets its own card named <Title>_1.mcd
-    s = s.replace(/^Card1Type\s*=.*/m, 'Card1Type = PerGameTitle');
-    // Set the directory to our saves/ps1 folder — use absolute path (safest)
-    const absDir = saveDir; // path.join already gave native separators
-    // Directory key is in [MemoryCards] section; replace it or add it
-    if (s.includes('[MemoryCards]')) {
-      s = s.replace(/^(Directory\s*=.*)$/m, `Directory = ${absDir}`);
-      if (!s.match(/^Directory\s*=/m)) {
-        s = s.replace('[MemoryCards]', `[MemoryCards]\nDirectory = ${absDir}`);
-      }
-    }
-    // Remove any hardcoded Card1Path so the auto-named file is used
-    s = s.replace(/^Card1Path\s*=.*/m, '');
-    fs.writeFileSync(ini, s);
-    console.log('[saves] DuckStation memcard dir →', saveDir);
-  }
-  if (id === 'pcsx2') {
-    const ini = path.join(e.dataDir, 'inis', 'PCSX2.ini');
-    if (!fs.existsSync(ini)) return;
-    let s = fs.readFileSync(ini, 'utf8');
-    const saveDir = path.join(SAVE_DIR, 'ps2');
-    fs.mkdirSync(saveDir, { recursive: true });
-    // PCSX2 uses an absolute or relative path; absolute is safest here
-    s = s.replace(/^MemoryCards\s*=.*/m, `MemoryCards = ${saveDir}`);
-    // McdFolderAutoManage already true from user's ini — ensure it stays
-    if (!/McdFolderAutoManage/.test(s)) {
-      s = s.replace(/(\[EmuCore\])/, '$1\nMcdFolderAutoManage = true');
-    }
-    fs.writeFileSync(ini, s);
-    console.log('[saves] PCSX2 memcard dir →', saveDir);
-  }
-}
-function patchAllEmulatorMemcardDirs() {
-  for (const [id, e] of Object.entries(config.emulators)) {
-    try { patchEmulatorMemcardDir(id, e); } catch(err) { console.warn('[saves] memcard patch failed for', id, err.message); }
-  }
-}
 // ---------- launch
 let running = null;
-function launchBare(exe) { const c = plat.spawnEmu(exe, [], { extraDirs: [SAVE_DIR], spawn: { detached: true } }); c.on('error', err => send('menu', 'toast', 'launch failed: ' + err.message)); c.unref(); }
+function launchBare(exe) { const c = plat.spawnEmu(exe, [], { spawn: { detached: true } }); c.on('error', err => send('menu', 'toast', 'launch failed: ' + err.message)); c.unref(); }
 function emulatorFor(sys) {
   for (const [id, e] of Object.entries(config.emulators)) if (recipes[id]?.systems.includes(sys) && e.exe) return { id, ...e, recipe: recipes[id] };
   return null;
@@ -464,16 +333,14 @@ function launch(gameId) {
   if (running) return { error: 'something is already running' };
   const emu = g.emulator ? { id: g.emulator, ...config.emulators[g.emulator], recipe: recipes[g.emulator] } : emulatorFor(g.sys);
   if (!emu || !emu.exe) return { error: `no emulator set up for ${SYSTEMS[g.sys]}` };
-  // prepare managed save dir and snapshot active save before launch
-  let saveInfo = null;
-  try { saveInfo = prepareSave(g); snapshotSave(g); } catch(e) { console.warn('save prep failed:', e.message); }
+  // snapshot whatever saves exist right now, so this session can always be rolled back (skipped if unchanged)
+  const before = safeSnapshot(g, { reason: 'before-play' });
   const argsTpl = g.args || emu.recipe.args[g.sys] || ['{rom}'];
-  const savePath = saveInfo?.activePath || '';
-  const args = argsTpl.map(a => a.replace('{rom}', g.path).replace('{dir}', plat.programDir(emu.exe)).replace('{save}', savePath));
+  const args = argsTpl.map(a => a.replace('{rom}', g.path).replace('{dir}', plat.programDir(emu.exe)));
   const started = Date.now();
   let child;
-  // flatpak emulators get the rom folder (read-only) and REPRO's saves folder punched into their sandbox
-  try { child = plat.spawnEmu(emu.exe, args, { roDirs: [path.dirname(g.path)], extraDirs: [SAVE_DIR] }); }
+  // flatpak emulators get the rom folder punched into their sandbox (read-only)
+  try { child = plat.spawnEmu(emu.exe, args, { roDirs: [path.dirname(g.path)] }); }
   catch (e) { return { error: e.message }; }
   child.on('error', err => { running = null; send('menu', 'toast', `couldn't start ${emu.recipe?.name || emu.id}: ${err.message}`); win?.restore(); });
   running = { gameId, pid: child.pid, started, child, exe: emu.exe };
@@ -481,12 +348,12 @@ function launch(gameId) {
   child.on('exit', () => {
     const secs = Math.round((Date.now() - started) / 1000);
     g.playtime = (g.playtime || 0) + secs; g.lastPlayed = Date.now(); saveLibrary();
-    // for xemu, copy back the HDD as a post-play snapshot (mtime check would be nice but is unreliable on qcow2)
-    if (g.sys === 'xbox' && secs > 10) try { snapshotXemu(g); } catch {}
+    // capture what this session saved. first-ever play of a per-game card only exists now. dedupes if nothing changed.
+    const after = secs > 5 ? safeSnapshot(g, { reason: 'after-play' }) : { skipped: 'too-short' };
     running = null;
-    if (win && !win.isDestroyed()) { win.restore(); win.focus(); win.webContents.send('game-exited', { gameId, secs }); }
+    if (win && !win.isDestroyed()) { win.restore(); win.focus(); win.webContents.send('game-exited', { gameId, secs, saved: !!after.ok }); }
   });
-  return { ok: true, exe: emu.exe, args, saveDir: saveInfo?.saveDir };
+  return { ok: true, exe: emu.exe, args, snapshot: before.ok ? before.slot.id : (before.skipped || before.error) };
 }
 function killRunning() {
   if (!running) return { error: 'nothing is running' };
@@ -600,17 +467,17 @@ function registerHubKey() {
 }
 // wayland: global shortcuts only work through the xdg GlobalShortcuts portal (KDE/GNOME ask the user once)
 if (plat.OS === 'linux') app.commandLine.appendSwitch('enable-features', 'GlobalShortcutsPortal');
-app.whenReady().then(() => { if (!process.argv.includes('--smoke')) { createWindow(); startGuideHook(); patchAllEmulatorMemcardDirs(); } });
+app.whenReady().then(() => { if (!process.argv.includes('--smoke')) { createWindow(); startGuideHook(); } });
 app.on('window-all-closed', () => app.quit());
 app.on('will-quit', () => { globalShortcut.unregisterAll(); stopGuideHook(); });
-module.exports = { detectEmulators, scanLibrary, snapshot, config, saveConfig, recipes, resolveDataDir, recipeForExe, isEmulatorFile, ROOT };
+module.exports = { library, saveCtx, launch, detectEmulators, scanLibrary, snapshot, config, saveConfig, recipes, resolveDataDir, recipeForExe, isEmulatorFile, ROOT };
 
 // ---------- ipc
 ipcMain.handle('snapshot', () => snapshot());
 ipcMain.handle('detect', async () => detectEmulators());
 ipcMain.handle('scan', async () => scanLibrary());
 ipcMain.handle('launch', (_, id) => launch(id));
-ipcMain.handle('setEmulator', (_, { id, exe }) => { config.emulators[id] = { exe, dataDir: resolveDataDir(recipes[id], exe) }; saveConfig(); buildMenu(); try { patchEmulatorMemcardDir(id, config.emulators[id]); } catch {} return snapshot(); });
+ipcMain.handle('setEmulator', (_, { id, exe }) => { config.emulators[id] = { exe, dataDir: resolveDataDir(recipes[id], exe) }; saveConfig(); buildMenu(); return snapshot(); });
 ipcMain.handle('openPath', (_, p) => shell.openPath(p));
 ipcMain.handle('launchEmu', (_, id) => { const e = config.emulators[id]; if (!e?.exe) return; launchBare(e.exe); });
 ipcMain.handle('addRomDir', async (_, { dir, system }) => { config.romDirs.push({ path: dir, system: system || null }); saveConfig(); return scanLibrary(); });
@@ -643,13 +510,14 @@ ipcMain.handle('createSystemFolder', (_, sys) => { const p = path.join(ROOT, 'ro
 ipcMain.handle('killRunning', () => killRunning());
 ipcMain.handle('isRunning', () => !!running);
 ipcMain.handle('setHubKey', (_, key) => { const prev = config.hubKey; config.hubKey = key; const ok = registerHubKey(); if (!ok) config.hubKey = prev; saveConfig(); return { ok, key: config.hubKey }; });
-// M2: saves
-ipcMain.handle('listSlots', (_, id) => { const g = library.games[id]; if (!g) return []; return listSlots(g); });
-ipcMain.handle('snapshotSave', (_, id) => { const g = library.games[id]; if (!g) return { error: 'no such game' }; try { const f = snapshotSave(g); return { ok: true, file: f }; } catch(e) { return { error: e.message }; } });
-ipcMain.handle('restoreSave', (_, { id, file }) => { const g = library.games[id]; if (!g) return { error: 'no such game' }; return restoreSave(g, file); });
-ipcMain.handle('renameSlot', (_, { id, from, to }) => { const g = library.games[id]; if (!g) return { error: 'no such game' }; return renameSlot(g, from, to); });
-ipcMain.handle('deleteSlot', (_, { id, file }) => { const g = library.games[id]; if (!g) return { error: 'no such game' }; return deleteSlot(g, file); });
-ipcMain.handle('openSaveFolder', (_, id) => { const g = library.games[id]; if (!g) return; const d = getSaveDir(g); fs.mkdirSync(d, { recursive: true }); shell.openPath(d); });
+// saves
+const withGame = fn => (_, arg) => { const id = typeof arg === 'string' ? arg : arg?.id; const g = library.games[id]; if (!g) return { error: 'no such game' }; try { return fn(g, arg); } catch (e) { return { error: e.message }; } };
+ipcMain.handle('saveInfo', withGame(g => saves.info(ROOT, saveCtx(g))));
+ipcMain.handle('snapshotSave', withGame((g, a) => { if (running?.gameId === g.id) return { error: 'close the game first, the emulator may be mid-write' }; return saves.snapshot(ROOT, saveCtx(g), { kind: 'manual', reason: 'manual', name: a?.name || null }); }));
+ipcMain.handle('restoreSave', withGame((g, { slot }) => { if (running) return { error: 'close the game before restoring a save' }; return saves.restore(ROOT, saveCtx(g), slot); }));
+ipcMain.handle('renameSlot', withGame((g, { slot, name }) => saves.rename(ROOT, g, slot, name)));
+ipcMain.handle('deleteSlot', withGame((g, { slot }) => saves.remove(ROOT, g, slot)));
+ipcMain.handle('openSaveFolder', withGame((g, a) => { const d = a?.live ? saves.info(ROOT, saveCtx(g)).base : saves.gameDir(ROOT, g); if (!d) return { error: 'no save folder' }; fs.mkdirSync(d, { recursive: true }); shell.openPath(d); return { ok: true }; }));
 ipcMain.on('quit', () => app.quit());
 
 // ---- multi-disc: generate .m3u for disc sets ----

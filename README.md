@@ -9,7 +9,7 @@ an emulator hub that actually does what you want. one folder, every emulator, ev
 
 - scans your whole PC for roms. finds them wherever they are, even if you move them later.
 - detects your emulators automatically. dolphin, pcsx2, duckstation, xemu, xenia — just point and go.
-- keeps saves organized. auto-snapshots before every launch, slot management, restore anytime.
+- real save management. REPRO finds the saves your emulator actually writes (DuckStation per-game cards, PCSX2 memory cards, Dolphin GCI/raw cards + Wii saves, the xemu HDD) and snapshots them before and after every session, only when something changed. name a snapshot to keep it forever. every restore takes an undo point first, so you can't lose a save by restoring the wrong one. REPRO never rewrites your emulator's settings.
 - pulls box art and descriptions from IGDB so your library looks like a library.
 - couch mode for the TV, desktop mode for the PC. controller-navigated with a guide overlay (like the xbox button).
 - portable. the whole thing runs from one folder. copy it anywhere, it works.

@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld('repro', {
   themes: call('themes'), openPath: call('openPath'), launchEmu: call('launchEmu'),
   duplicates: call('duplicates'), saveView: call('saveView'), removeView: call('removeView'), createSystemFolder: call('createSystemFolder'),
   killRunning: call('killRunning'), isRunning: call('isRunning'), setHubKey: call('setHubKey'),
-  listSlots: call('listSlots'), snapshotSave: call('snapshotSave'), restoreSave: call('restoreSave'),
+  saveInfo: call('saveInfo'), snapshotSave: call('snapshotSave'), restoreSave: call('restoreSave'),
   renameSlot: call('renameSlot'), deleteSlot: call('deleteSlot'), openSaveFolder: call('openSaveFolder'),
   quit: () => ipcRenderer.send('quit'),
   scrapeAll: call('scrapeAll'), scrapeOne: call('scrapeOne'),

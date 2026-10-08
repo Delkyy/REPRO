@@ -181,51 +181,61 @@ function renderDetail() {
 }
 async function toggleFav(id) { const g = byId(id); const r = await repro.setGame({ id, patch: { fav: !g.fav } }); Object.assign(g, r); toast(g.fav ? 'added to favorites' : 'removed from favorites'); renderAll(); }
 
+// ---------- saves tab. REPRO snapshots the files the emulator really writes (see src/main/saves.js).
+const fmtBytes = b => b > 1e9 ? (b / 1e9).toFixed(1) + 'GB' : b > 1e6 ? (b / 1e6).toFixed(1) + 'MB' : b > 1e3 ? Math.round(b / 1e3) + 'KB' : b + 'B';
+const fmtWhen = ms => { const d = (Date.now() - ms) / 1000; if (d < 60) return 'just now'; if (d < 3600) return `${Math.floor(d / 60)}m ago`; if (d < 86400) return `${Math.floor(d / 3600)}h ago`; return new Date(ms).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+const SLOT_WHY = { 'before-play': 'before playing', 'after-play': 'after playing', 'before-restore': 'safety copy before a restore', manual: 'snapshot' };
+const slotTitle = sl => sl.name || (sl.kind === 'safety' ? 'undo point' : SLOT_WHY[sl.reason] || sl.reason);
 async function loadSavesTab(g) {
-  const slots = await repro.listSlots(g.id);
   const pane = $('#savesPane'); if (!pane) return;
-  const fmtSize = b => b > 1e6 ? (b/1e6).toFixed(1)+'MB' : b > 1e3 ? (b/1e3).toFixed(0)+'KB' : b+'B';
-  const fmtDate = ms => new Date(ms).toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+  const I = await repro.saveInfo(g.id);
+  if (!$('#savesPane') || sel !== g.id) return; // user moved on while we were reading the disk
+  if (I.error) { pane.innerHTML = `<div class="hint">${esc(I.error)}</div>`; return; }
+  if (!I.emulator) { pane.innerHTML = `<div class="hint">set up an emulator for ${esc(sysName(g.sys))} first. REPRO reads saves from wherever the emulator keeps them.</div>`; return; }
+  if (!I.supported) { pane.innerHTML = `<div class="hint">REPRO can't find ${esc(S.emulators[I.emulator]?.name || I.emulator)}'s save folder yet. run the emulator once so it creates it, then come back.</div>`; return; }
+  const live = I.live
+    ? `<div class="slot live"><div class="sh glyph" style="color:var(--accent2)">●</div><div class="t"><b>current save</b><small>${esc(I.label)} · ${fmtBytes(I.live.size)} · changed ${fmtWhen(I.live.mtime)}</small></div><div class="act" style="opacity:1"><button id="sLiveFolder">open</button></div></div>`
+    : `<div class="slot live"><div class="sh glyph">○</div><div class="t"><b>no save yet</b><small>${esc(I.label)}. REPRO grabs it automatically after you play.</small></div></div>`;
+  const shared = I.live && !I.perGame ? `<div class="hint" style="margin:-2px 0 10px">heads up: this emulator keeps one card for every game, so a restore rolls back <b>all</b> ${esc(sysName(g.sys))} saves on that card. an undo point is taken first.</div>` : '';
   pane.innerHTML = `
     <div class="btnrow" style="margin-bottom:12px">
-      <button id="sSave" title="snapshot current save now">+ snapshot now</button>
-      <button id="sFolder" title="open save folder in explorer">▣ folder</button>
+      <button id="sSave" ${I.live ? '' : 'disabled'}>+ snapshot now</button>
+      <button id="sFolder">▣ snapshots folder</button>
     </div>
-    ${slots.length ? slots.map(sl => `
-    <div class="slot ${sl.isAuto?'auto':''}" data-file="${esc(sl.file)}">
-      <div class="sh" style="background:${sl.isActive ? 'var(--accent)' : sl.isAuto ? '#3a3a44' : 'linear-gradient(135deg,#3a4a7a,#1f2b4d)'}"></div>
-      <div class="t">
-        <b>${sl.isActive ? 'active (live)' : sl.isAuto ? sl.file.slice(5,-1-sl.file.split('.').pop().length) : sl.file.replace(/\.[^.]+$/,'')}</b>
-        <small>${fmtDate(sl.mtime)} · ${fmtSize(sl.size)}</small>
-      </div>
+    ${live}${shared}
+    ${I.slots.length ? I.slots.map(sl => `
+    <div class="slot ${sl.kind}" data-slot="${esc(sl.id)}">
+      <div class="sh glyph kind-${sl.kind}">${sl.kind === 'manual' ? '★' : sl.kind === 'safety' ? '↺' : '◷'}</div>
+      <div class="t"><b>${esc(slotTitle(sl))}</b><small>${fmtWhen(sl.created)} · ${fmtBytes(sl.size)}${sl.files > 1 ? ` · ${sl.files} files` : ''}${sl.kind === 'auto' ? ' · auto' : ''}</small></div>
       <div class="act">
-        ${sl.isActive ? '' : `<button data-restore="${esc(sl.file)}">restore</button>`}
-        ${sl.isActive ? '' : `<button data-rename="${esc(sl.file)}">rename</button>`}
-        ${sl.isActive || sl.isAuto ? '' : `<button data-del="${esc(sl.file)}" style="color:var(--accent)">✕</button>`}
+        <button data-restore="${esc(sl.id)}">restore</button>
+        <button data-rename="${esc(sl.id)}">${sl.kind === 'manual' ? 'rename' : 'keep'}</button>
+        <button data-del="${esc(sl.id)}" style="color:var(--accent)">✕</button>
       </div>
-    </div>`).join('') : `<div class="hint">no saves yet — play the game and REPRO will snapshot automatically before each launch.</div>`}`;
-  $('#sSave').onclick = async () => { const r = await repro.snapshotSave(g.id); if (r.error) toast(`<b>error:</b> ${esc(r.error)}`); else { toast('snapshot taken'); loadSavesTab(g); } };
-  $('#sFolder').onclick = () => repro.openSaveFolder(g.id);
+    </div>`).join('') : `<div class="hint">no snapshots yet. REPRO takes one before and after every session, only when the save actually changed. name one to keep it forever.</div>`}`;
+  $('#sSave').onclick = async () => { const r = await repro.snapshotSave({ id: g.id }); if (r.error) toast(`<b>error:</b> ${esc(r.error)}`); else toast(r.ok ? 'snapshot taken' : 'nothing to snapshot yet'); loadSavesTab(g); };
+  $('#sFolder').onclick = () => repro.openSaveFolder({ id: g.id });
+  const lf = $('#sLiveFolder'); if (lf) lf.onclick = () => repro.openSaveFolder({ id: g.id, live: true });
   pane.querySelectorAll('[data-restore]').forEach(b => b.onclick = async () => {
-    const r = await repro.restoreSave({ id: g.id, file: b.dataset.restore });
-    if (r.error) toast(`<b>restore failed:</b> ${esc(r.error)}`); else { toast('restored. restart the game to play it.'); loadSavesTab(g); }
+    const r = await repro.restoreSave({ id: g.id, slot: b.dataset.restore });
+    if (r.error) toast(`<b>restore failed:</b> ${esc(r.error)}`); else { toast('restored. an undo point was saved first.'); loadSavesTab(g); }
   });
-  pane.querySelectorAll('[data-rename]').forEach(b => b.onclick = async () => {
-    const cur = b.dataset.rename.replace(/\.[^.]+$/,'');
-    const from = b.dataset.rename;
+  pane.querySelectorAll('[data-rename]').forEach(b => b.onclick = () => {
+    const slot = b.dataset.rename, cur = I.slots.find(x => x.id === slot);
     const gen = ++modalGen;
-    $('#modal').innerHTML = `<div class="box" style="max-width:460px"><div class="mh"><h3>Rename save</h3><button class="icon" id="mClose">✕</button></div><div class="mb"><div class="kv"><span>name</span><input id="rnInput" value="${esc(cur)}" style="max-width:280px"></div><div class="btnrow" style="margin-top:12px"><button id="rnSave" style="background:var(--accent);color:#fff;border-color:transparent">rename</button></div></div></div>`;
-    $('#mClose').onclick = () => { if (gen !== modalGen) return; modalGen++; $('#modal').classList.remove('open'); };
+    $('#modal').innerHTML = `<div class="box" style="max-width:460px"><div class="mh"><h3>Name this save</h3><button class="icon" id="mClose">✕</button></div><div class="mb"><div class="hint" style="margin-bottom:8px">named saves are kept forever, auto snapshots rotate out.</div><div class="kv"><span>name</span><input id="rnInput" value="${esc(cur?.name || '')}" placeholder="before the final boss" style="max-width:280px"></div><div class="btnrow" style="margin-top:12px"><button id="rnSave" style="background:var(--accent);color:#fff;border-color:transparent">save name</button></div></div></div>`;
+    const close = () => { modalGen++; $('#modal').classList.remove('open'); };
+    $('#mClose').onclick = () => { if (gen === modalGen) close(); };
     $('#rnSave').onclick = async () => {
       if (gen !== modalGen) return;
-      const nw = $('#rnInput').value.trim(); if (!nw || nw === cur) { modalGen++; $('#modal').classList.remove('open'); return; }
-      const r = await repro.renameSlot({ id: g.id, from, to: nw });
-      if (r.error) toast(`<b>error:</b> ${esc(r.error)}`); else { modalGen++; $('#modal').classList.remove('open'); loadSavesTab(g); }
+      const nw = $('#rnInput').value.trim(); if (!nw) return close();
+      const r = await repro.renameSlot({ id: g.id, slot, name: nw });
+      if (r.error) toast(`<b>error:</b> ${esc(r.error)}`); else { close(); loadSavesTab(g); }
     };
-    $('#modal').classList.add('open');
+    $('#modal').classList.add('open'); setTimeout(() => $('#rnInput')?.focus(), 0);
   });
   pane.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
-    const r = await repro.deleteSlot({ id: g.id, file: b.dataset.del });
+    const r = await repro.deleteSlot({ id: g.id, slot: b.dataset.del });
     if (r.error) toast(`<b>error:</b> ${esc(r.error)}`); else { toast('deleted'); loadSavesTab(g); }
   });
 }
@@ -238,7 +248,7 @@ async function scrapeOne(id) {
   toast(r.artPath ? `got art for <b>${esc(g.title)}</b>` : `no art found for <b>${esc(g.title)}</b> — try IGDB credentials in Settings`);
   renderAll();
 }
-repro.onGameExited(async ({ gameId, secs }) => { await refresh(); const g = byId(gameId); toast(`back. <b>${esc(g?.title)}</b>, ${fmtPt(secs)} this session.`); });
+repro.onGameExited(async ({ gameId, secs, saved }) => { await refresh(); const g = byId(gameId); toast(`back. <b>${esc(g?.title)}</b>, ${fmtPt(secs)} this session.${saved ? ' save snapshotted.' : ''}`); });
 
 /* ---------- couch mode (ported from sketch 001) ---------- */
 function renderCouch() {
@@ -573,19 +583,20 @@ async function renderGuideRight(g) {
       <button class="gbtn" data-action="desktop"><span class="k">▤</span>Go to desktop</button>
       <div class="hints"><span><span class="b">B</span>close</span><span><span class="b">↑↓</span>navigate</span><span><span class="b">A</span>select</span></div>`;
   } else if (guideSection === 'saves') {
-    const slots = g ? await repro.listSlots(g.id) : [];
+    const I = g ? await repro.saveInfo(g.id) : { slots: [] };
+    const slots = I.slots || [];
     guideSlotsCache = slots;
-    const fmtSlot = sl => sl.isActive ? 'active' : sl.isAuto ? sl.file.slice(5, sl.file.lastIndexOf('.')) : sl.file.replace(/\.[^.]+$/,'');
+    const fmtSlot = sl => slotTitle(sl);
     el.innerHTML = `
       <h4>Save slots — ${esc(g?.title||'')}</h4>
-      ${slots.length ? `<div class="slots-mini">${slots.slice(0,8).map((sl,i) => `<div class="sm ${sl.isActive?'act':''}" data-slot="${i}">${esc(fmtSlot(sl))}<br><span style="opacity:.6">${fmtTs(sl.mtime)} · ${fmtSize(sl.size)}</span></div>`).join('')}</div>` : '<div class="meta" style="margin:10px 0">no saves yet — play the game first.</div>'}
+      ${slots.length ? `<div class="slots-mini">${slots.slice(0,8).map((sl,i) => `<div class="sm" data-slot="${i}">${esc(fmtSlot(sl))}<br><span style="opacity:.6">${fmtWhen(sl.created)} · ${fmtSize(sl.size)}</span></div>`).join('')}</div>` : `<div class="meta" style="margin:10px 0">${I.live ? 'no snapshots yet.' : 'no saves yet. play the game first.'}</div>`}
       <div style="margin-top:14px"></div>
       <button class="gbtn primary focus" data-action="snapshot"><span class="k">A</span>Snapshot now</button>
       <button class="gbtn" data-action="opensaves"><span class="k">X</span>Open save folder</button>
       <div class="hints"><span><span class="b">B</span>close</span><span><span class="b">A</span>snapshot</span></div>`;
     el.querySelectorAll('[data-slot]').forEach(b => b.onclick = async () => {
-      const sl = slots[+b.dataset.slot]; if (!sl || sl.isActive) return;
-      await repro.restoreSave({ id: g.id, file: sl.file }); toast('restored — restart to play it'); closeGuide();
+      const sl = slots[+b.dataset.slot]; if (!sl) return;
+      const r = await repro.restoreSave({ id: g.id, slot: sl.id }); toast(r.error ? `<b>restore failed:</b> ${esc(r.error)}` : 'restored. undo point saved first.'); closeGuide();
     });
   } else if (guideSection === 'settings') {
     const hub = S.config.hubKey || 'Ctrl+Alt+H';
@@ -622,8 +633,8 @@ function guideAction(action, g) {
   else if (action === 'fav') { if (g) toggleFav(g.id); closeGuide(); }
   else if (action === 'desktop') { closeGuide(); setMode('desktop'); }
   else if (action === 'quit') { closeGuide(); repro.quit?.() || window.close(); }
-  else if (action === 'snapshot') { if (g) { repro.snapshotSave(g.id).then(()=>{ toast('snapshot taken'); renderGuideRight(g); }); } }
-  else if (action === 'opensaves') { if (g) repro.openSaveFolder(g.id); closeGuide(); }
+  else if (action === 'snapshot') { if (g) { repro.snapshotSave({ id: g.id }).then(r=>{ toast(r.error ? esc(r.error) : r.ok ? 'snapshot taken' : 'nothing to snapshot yet'); renderGuideRight(g); }); } }
+  else if (action === 'opensaves') { if (g) repro.openSaveFolder({ id: g.id }); closeGuide(); }
   else if (action === 'theme-billet') { setTheme('billet'); closeGuide(); }
   else if (action === 'theme-manual') { setTheme('manual'); closeGuide(); }
   else if (action === 'theme-crt') { setTheme('crt'); closeGuide(); }
