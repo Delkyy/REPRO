@@ -20,7 +20,7 @@ const byId = id => S.games.find(g => g.id === id);
 const played = () => S.games.filter(g => g.lastPlayed).sort((a, b) => b.lastPlayed - a.lastPlayed);
 let tt; function toast(h) { const t = $('#toast'); t.innerHTML = h; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 3000); }
 
-function artEl(g) { return g.art ? `<img src="${fileUrl(g.art)}" alt="">` : `<div class="noart">${logo(g.sys)}${esc(g.title)}<small>no art yet</small></div>`; }
+function artEl(g) { return g.art ? `<img src="${fileUrl(g.art)}" alt="" decoding="async">` : `<div class="noart">${logo(g.sys)}${esc(g.title)}<small>no art yet</small></div>`; }
 // ---------- shelf cards: store top bar colored from the cover, card shaped like the real box
 const SHORT = { nes: 'NES', snes: 'SNES', n64: 'N64', gc: 'GAMECUBE', wii: 'WII', wiiu: 'WII U', switch: 'SWITCH', gb: 'GAME BOY', gbc: 'GB COLOR', gba: 'GBA', ds: 'DS', '3ds': '3DS', ps1: 'PS1', ps2: 'PS2', ps3: 'PS3', ps4: 'PS4', ps5: 'PS5', psp: 'PSP', vita: 'VITA', xbox: 'XBOX', x360: 'XBOX 360', xone: 'XBOX ONE', xsx: 'SERIES X|S', genesis: 'GENESIS', sms: 'MASTER SYS', gg: 'GAME GEAR', segacd: 'SEGA CD', '32x': '32X', saturn: 'SATURN', dc: 'DREAMCAST', tg16: 'TG-16', atari2600: '2600', arcade: 'ARCADE', pc: 'PC' };
 const REGION = f => { const m = (f || '').match(/\((USA|World|Europe|Japan)[,)]/i) || (f || '').match(/\((?:[^()]*, )?(USA|Europe|Japan)\)/i); return m ? ({ usa: 'USA', world: 'WORLD', europe: 'EUR', japan: 'JPN' })[m[1].toLowerCase()] : ''; };
@@ -340,21 +340,47 @@ repro.onCoversProgress(async d => {
 repro.onGameExited(async ({ gameId, secs, saved }) => { await refresh(); const g = byId(gameId); toast(`back. <b>${esc(g?.title)}</b>, ${fmtPt(secs)} this session.${saved ? ' save snapshotted.' : ''}`); });
 
 /* ---------- couch mode (ported from sketch 001) ---------- */
+// couch rows are windowed: each strip holds ~50 tiles around its column, spacer margins keep every tile's offsetLeft
+// where it would be with the full row, so the slide animation and clamping math don't know the difference.
+// (rendering all 11k covers at once is what blanked the window: chromium gave up loading thousands of images.)
+const C_WIN = 40, C_EDGE = 18; // a screen holds ~11 tiles: always keep 18+ loaded past the focus on both sides
+let cData = [], cRowStart = [], cRowCol = [];
+let bgFlip = false;
 function renderCouch() {
   const rows = []; const cont = played().slice(0, 8); if (cont.length) rows.push({ k: 'continue', n: 'Continue', items: cont });
   for (const k of Object.keys(S.systems)) { const it = S.games.filter(g => g.sys == k).sort((a, b) => a.title.localeCompare(b.title)); if (it.length) rows.push({ k, n: sysName(k), items: it }); }
-  cList = []; cRows = [];
+  cList = []; cRows = []; cRowStart = [];
+  rows.forEach((r, ri) => { cRowStart[ri] = cList.length; for (const g of r.items) { cList.push(g.id); cRows.push(ri); } });
+  cRowCol = rows.map((r, ri) => Math.min(cRowCol[ri] || 0, r.items.length - 1));
+  cData = rows;
   if (!rows.length) { $('#cinner').innerHTML = `<div class="hint" style="padding:20px 48px">no games yet. switch to desktop and hit +.</div>`; $('#chero').innerHTML = ''; return; }
-  $('#cinner').innerHTML = rows.map((r, ri) => `<div class="crow" data-ri="${ri}" ${r.k == 'continue' ? '' : sysc(r.k)} data-skin="${S.sysdb?.[r.k]?.skin || ''}"><h3>${r.k == 'continue' ? '' : logo(r.k)}<b>${esc(r.n)}</b> ${r.items.length}</h3><div class="strip">${r.items.map(g => { cList.push(g.id); cRows.push(ri); return `<div class="ctile" data-id="${esc(g.id)}" ${r.k == 'continue' ? sysc(g.sys) : ''}>${artEl(g)}</div>`; }).join('')}</div></div>`).join('');
-  $('#crows').querySelectorAll('.ctile[data-id]').forEach((t, i) => { t.onmouseenter = () => cSetFocus(i); t.onclick = () => { if (cFocus == i) cOpen(); else cSetFocus(i); }; });
+  $('#cinner').innerHTML = rows.map((r, ri) => `<div class="crow" data-ri="${ri}" ${r.k == 'continue' ? '' : sysc(r.k)} data-skin="${S.sysdb?.[r.k]?.skin || ''}"><h3>${r.k == 'continue' ? '' : logo(r.k)}<b>${esc(r.n)}</b> ${r.items.length}</h3><div class="strip" data-ri="${ri}"></div></div>`).join('');
+  rows.forEach((_, ri) => cPaintRow(ri));
   cSetFocus(Math.min(cFocus, cList.length - 1));
 }
-let bgFlip = false;
+function cPaintRow(ri) {
+  const strip = $(`#cinner .strip[data-ri="${ri}"]`); if (!strip) return;
+  const r = cData[ri], n = r.items.length, col = cRowCol[ri] || 0;
+  const a = Math.max(0, col - C_WIN), b = Math.min(n, col + C_WIN + 1);
+  strip.dataset.a = a; strip.dataset.b = b;
+  let html = '';
+  for (let i = a; i < b; i++) { const g = r.items[i]; html += `<div class="ctile" data-gi="${cRowStart[ri] + i}" data-id="${esc(g.id)}" ${r.k == 'continue' ? sysc(g.sys) : ''}>${artEl(g)}</div>`; }
+  strip.innerHTML = html;
+  const first = strip.firstElementChild, last = strip.lastElementChild; if (!first) return;
+  const step = first.offsetWidth + (parseFloat(getComputedStyle(strip).columnGap) || 0);
+  if (a) first.style.marginLeft = a * step + 'px';
+  if (n - b) last.style.marginRight = (n - b) * step + 'px';
+}
 function cSetFocus(i) {
-  const tiles = [...$('#crows').querySelectorAll('.ctile[data-id]')]; if (!tiles.length) return;
-  cFocus = Math.max(0, Math.min(tiles.length - 1, i));
-  tiles.forEach(t => t.classList.remove('focus')); const t = tiles[cFocus]; t.classList.add('focus');
-  const ri = cRows[cFocus], crows = [...$('#crows').querySelectorAll('.crow')];
+  if (!cList.length) return;
+  cFocus = Math.max(0, Math.min(cList.length - 1, i));
+  const ri = cRows[cFocus], col = cFocus - cRowStart[ri];
+  cRowCol[ri] = col;
+  const st = $(`#cinner .strip[data-ri="${ri}"]`);
+  if (st) { const a = +st.dataset.a, b = +st.dataset.b; if ((a > 0 && col - a < C_EDGE) || (b < cData[ri].items.length && b - col < C_EDGE)) cPaintRow(ri); }
+  $('#crows .ctile.focus')?.classList.remove('focus');
+  const t = $(`#crows .ctile[data-gi="${cFocus}"]`); if (!t) return; t.classList.add('focus');
+  const crows = [...$('#crows').querySelectorAll('.crow')];
   const inner = $('#cinner'), padTop = parseFloat(getComputedStyle(inner).paddingTop);
   inner.style.transform = `translateY(-${crows[ri].offsetTop - padTop}px)`;
   crows.forEach((c, k) => { c.classList.toggle('dim', k > ri); c.classList.toggle('gone', k < ri); });
@@ -371,6 +397,9 @@ function cSetFocus(i) {
   const ck = $('#cskin'); if (skin) { ck.dataset.skin = skin; ck.classList.add('on'); } else { ck.classList.remove('on'); }
   $('#couchwrap').classList.toggle('hasskin', !!skin);
 }
+// tiles come and go as rows re-window, so one delegated handler instead of one per tile
+$('#crows').addEventListener('mouseover', e => { const t = e.target.closest('.ctile[data-gi]'); if (t && +t.dataset.gi !== cFocus) cSetFocus(+t.dataset.gi); });
+$('#crows').addEventListener('click', e => { const t = e.target.closest('.ctile[data-gi]'); if (!t) return; if (+t.dataset.gi === cFocus) cOpen(); else cSetFocus(+t.dataset.gi); });
 function cOpen() {
   const g = byId(cList[cFocus]); if (!g) return;
   $('#cov').innerHTML = `<div class="box" ${sysc(g.sys)}>${g.art ? `<img class="big" src="${fileUrl(g.art)}">` : `<div class="noart">no art yet</div>`}
