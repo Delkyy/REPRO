@@ -103,4 +103,48 @@ test('every source file parses (renderer included: a syntax error there blanks t
   assert.ok(files.some(f => f.endsWith('app.js')));
 });
 
+test('archived carts: .7z in a system folder scans for retroarch systems; nes no longer matches snes/genesis folders', async () => {
+  const lib = path.join(TMP, 'carts');
+  for (const [d, f] of [['snes', 'Super Metroid (Japan, USA) (En,Ja).7z'], ['genesis', 'Sonic the Hedgehog (USA, Europe).7z'], ['nes', 'Metroid (USA).zip'], ['nes', 'Metroid (USA) (Virtual Console).zip'], ['snes', 'Chrono Trigger (USA).7z'], ['snes', 'Chrono Trigger (USA).sfc'], ['gba', 'Advance Wars (USA).7z'], ['ps2', 'Devil May Cry (USA).zip'], ['misc', 'Mystery.7z']]) {
+    fs.mkdirSync(path.join(lib, d), { recursive: true }); fs.writeFileSync(path.join(lib, d, f), 'x');
+  }
+  M.config.romDirs = [{ path: lib, system: null }];
+  const s = await M.scanLibrary();
+  const sysOf = t => Object.values(M.library.games).find(g => g.title === t)?.sys;
+  assert.strictEqual(sysOf('Super Metroid'), 'snes');
+  assert.strictEqual(sysOf('Sonic the Hedgehog'), 'genesis');
+  assert.strictEqual(sysOf('Metroid'), 'nes');
+  assert.strictEqual(sysOf('Advance Wars'), 'gba');
+  const metroids = Object.values(M.library.games).filter(g => g.title.startsWith('Metroid'));
+  assert.strictEqual(metroids.length, 2, 'a longer variant name must not hide the original release');
+  const chrono = Object.values(M.library.games).filter(g => g.title === 'Chrono Trigger');
+  assert.deepStrictEqual(chrono.map(g => g.file), ['Chrono Trigger (USA).sfc'], 'extracted copy wins over its archive');
+  assert.strictEqual(sysOf('Devil May Cry'), undefined, 'ps2 zip still needs extracting (pcsx2 cannot read zip)');
+  assert.ok((s.unsorted || []).some(u => /Mystery/.test(u.path)) || !sysOf('Mystery'));
+});
+
+test('regions merge into one card: USA preferred over Europe/Japan, others kept as variants, played copy sticks', async () => {
+  const lib = path.join(TMP, 'regions', 'snes');
+  fs.mkdirSync(lib, { recursive: true });
+  for (const f of ['Super Metroid (Europe) (En,Fr,De).7z', 'Super Metroid (Japan, USA) (En,Ja).7z', 'Zelda (Japan).7z', 'Zelda (Beta) (USA).7z']) fs.writeFileSync(path.join(lib, f), 'x');
+  M.config.romDirs = [{ path: path.dirname(lib), system: null }];
+  await M.scanLibrary();
+  const sm = Object.values(M.library.games).filter(g => g.title === 'Super Metroid');
+  assert.strictEqual(sm.length, 1);
+  assert.strictEqual(sm[0].file, 'Super Metroid (Japan, USA) (En,Ja).7z');
+  assert.strictEqual(sm[0].variants.length, 1);
+  assert.strictEqual(Object.values(M.library.games).find(g => g.title === 'Zelda').file, 'Zelda (Japan).7z', 'a real japan release beats a USA beta');
+  // the european copy has playtime: it stays the card after a rescan
+  const eu = path.join(lib, 'Super Metroid (Europe) (En,Fr,De).7z');
+  M.library.games[eu] = { ...sm[0], path: eu, id: eu, playtime: 3600 };
+  await M.scanLibrary();
+  assert.strictEqual(Object.values(M.library.games).find(g => g.title === 'Super Metroid').path, eu);
+});
+
+test('retroarch launch args: core per system, bare core filename', () => {
+  const r = M.recipes.retroarch;
+  assert.deepStrictEqual(r.args['*'], ['-f', '-L', '{core}', '{rom}']);
+  for (const sys of r.systems) assert.ok(r.cores[sys], 'core for ' + sys);
+});
+
 test.after(() => fs.rmSync(TMP, { recursive: true, force: true }));

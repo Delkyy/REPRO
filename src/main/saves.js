@@ -124,7 +124,42 @@ const ADAPTERS = {
     const hdd = resolveIn(ctx.dataDir, m[2]);
     return { base: path.dirname(hdd), rels: exists(hdd) ? [path.basename(hdd)] : [], label: 'Xbox HDD image (all games)', perGame: false, big: true };
   },
+  // runloop.c save dir: savefile_directory (empty, or savefiles_in_content_dir -> the rom's folder), then
+  // sort_savefiles_by_content (+ rom folder name) and sort_savefiles_enable (default true, + core library_name).
+  // files: <rom stem>.srm / .rtc. which core ran isn't recorded anywhere, so look in the dir and its core subfolders.
+  retroarch(ctx) {
+    const cfg = readRaCfg(path.join(ctx.dataDir, 'retroarch.cfg'));
+    const g = ctx.game, romDir = g.path ? path.dirname(g.path) : null;
+    let dir = raPath(cfg.savefile_directory, ctx.dataDir);
+    if (!dir || cfg.savefiles_in_content_dir === 'true') dir = romDir;
+    if (!dir) return null;
+    const stem = norm((g.file || path.basename(g.path || g.title)).replace(/\.[^.]+$/, ''));
+    const rels = [];
+    const look = (rel, depth) => {
+      let ents = []; try { ents = fs.readdirSync(path.join(dir, rel), { withFileTypes: true }); } catch { return; }
+      for (const e of ents) {
+        const r = path.join(rel, e.name);
+        if (e.isDirectory()) { if (depth < 2) look(r, depth + 1); continue; }
+        const m = e.name.match(/^(.*)\.(srm|rtc)$/i);
+        if (m && norm(m[1]) === stem) rels.push(r);
+      }
+    };
+    look('', 0);
+    return { base: dir, rels, label: 'cartridge save (.srm)', perGame: true };
+  },
 };
+// retroarch.cfg: key = "value". "~" is home, ":" is the retroarch program folder, "default" means unset.
+function readRaCfg(file) {
+  const out = {}; let t = ''; try { t = fs.readFileSync(file, 'utf8'); } catch { return out; }
+  for (const line of t.split(/\r?\n/)) { const m = line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*"(.*)"\s*$/); if (m) out[m[1]] = m[2]; }
+  return out;
+}
+function raPath(v, dataDir) {
+  if (!v || v === 'default') return null;
+  if (v === '~' || v.startsWith('~/')) return path.join(require('os').homedir(), v.slice(2));
+  if (v.startsWith(':')) return path.join(dataDir, v.slice(1).replace(/^[\\/]+/, ''));
+  return resolveIn(dataDir, v);
+}
 const supports = emuId => !!ADAPTERS[emuId];
 
 function locate(ctx) {

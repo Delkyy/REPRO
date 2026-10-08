@@ -127,6 +127,22 @@ test('snapshot store: dedupe, restore with undo point, rename pins, pruning keep
   assert.ok(saves.remove(root, crash, '../../etc').error, 'slot ids cannot escape the save folder');
 });
 
+test('retroarch: .srm found under the per-core folder, savefile_directory honoured, other games ignored', () => {
+  const data = fresh(), saveDir = path.join(fresh(), 'ra-saves');
+  put(path.join(data, 'retroarch.cfg'), `savefile_directory = "${saveDir}"\nsort_savefiles_enable = "true"\n`);
+  put(path.join(saveDir, 'Snes9x', 'Super Metroid (Japan, USA) (En,Ja).srm'), 'metroid');
+  put(path.join(saveDir, 'Snes9x', 'Chrono Trigger (USA).srm'), 'chrono');
+  const g = { sys: 'snes', title: 'Super Metroid', file: 'Super Metroid (Japan, USA) (En,Ja).7z', path: '/roms/snes/Super Metroid (Japan, USA) (En,Ja).7z' };
+  const loc = saves.locate({ emulator: 'retroarch', dataDir: data, game: g });
+  assert.strictEqual(loc.base, saveDir);
+  assert.deepStrictEqual(loc.rels, [path.join('Snes9x', 'Super Metroid (Japan, USA) (En,Ja).srm')]);
+  // savefiles_in_content_dir -> next to the rom
+  const romDir = fresh();
+  put(path.join(data, 'retroarch.cfg'), 'savefiles_in_content_dir = "true"\n');
+  put(path.join(romDir, 'Zelda.srm'), 'z');
+  assert.deepStrictEqual(saves.locate({ emulator: 'retroarch', dataDir: data, game: { sys: 'nes', file: 'Zelda.nes', path: path.join(romDir, 'Zelda.nes') } }).rels, ['Zelda.srm']);
+});
+
 test('snapshot store: nothing to save, unknown emulator', () => {
   const root = fresh();
   assert.deepStrictEqual(saves.snapshot(root, { emulator: 'duckstation', dataDir: fresh(), game: crash }), { skipped: 'nothing-to-save' });

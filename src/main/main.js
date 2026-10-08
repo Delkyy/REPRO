@@ -205,7 +205,12 @@ async function recoverMissingPaths(onProgress) {
 const ALL_EXT = {}; // ext -> [system]
 // these are launchable but a scan should never pick them up (every emulator ships .exe/.bin/.elf files)
 const NOSCAN = new Set(['.exe', '.lnk', '.bin', '.elf', '.gz']); // pc games get added on purpose (M4), not by scan
-for (const r of Object.values(recipes)) for (const [sys, exts] of Object.entries(r.extensions)) for (const e of exts) if (!NOSCAN.has(e)) (ALL_EXT[e] ??= new Set()).add(sys);
+const ARCHIVE_EXT = /\.(7z|zip)$/i;
+const ARCHIVE_SYS = new Set(); // systems whose emulator opens .7z/.zip itself; anywhere else an archive is "extract it first"
+for (const r of Object.values(recipes)) for (const [sys, exts] of Object.entries(r.extensions)) for (const e of exts) {
+  if (ARCHIVE_EXT.test(e)) { if (r.archives) ARCHIVE_SYS.add(sys); continue; }
+  if (!NOSCAN.has(e)) (ALL_EXT[e] ??= new Set()).add(sys);
+}
 // systems.json covers systems no recipe knows yet, so their roms land in the library (unlaunchable until an emulator is added)
 for (const [sys, v] of Object.entries(SYSDB)) for (const e of v.ext) if (!NOSCAN.has(e) && !/\.(zip|iso|chd|cue|bin)$/.test(e)) (ALL_EXT[e] ??= new Set()).add(sys);
 const ROM_EXTS = new Set(Object.keys(ALL_EXT)); // used by deepScanDrive; must come after ALL_EXT is filled
@@ -216,13 +221,27 @@ function titleFromFile(name) {
     .replace(/\s*[\(\[](USA|Europe|Japan|World|En|Ja|Fr|De|Es|It|Rev \d+|T-En|Canada|Australia|[A-Za-z]{2}(,[A-Za-z]{2})+|[!bh]|Fixed)[^\)\]]*[\)\]]/gi, '')
     .replace(/\s+/g, ' ').trim();
 }
+// a folder named exactly like a system id or name ("snes", "Super Nintendo", "ps1"), nearest folder wins
+const SYS_ALIASES = { psx: 'ps1', megadrive: 'genesis', md: 'genesis', gamecube: 'gc', ngc: 'gc', n3ds: '3ds', nds: 'ds', mastersystem: 'sms', gamegear: 'gg', famicom: 'nes', sfc: 'snes', superfamicom: 'snes', pce: 'tg16', dreamcast: 'dc' };
+function sysFromDir(p) {
+  const segs = path.dirname(p).split(/[\\/]/).reverse();
+  for (const seg of segs) {
+    const k = seg.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!k) continue;
+    if (SYSTEMS[k]) return k;
+    if (SYS_ALIASES[k]) return SYS_ALIASES[k];
+    for (const [id, name] of Object.entries(SYSTEMS)) if (name.toLowerCase().replace(/[^a-z0-9]/g, '') === k) return id;
+  }
+  return null;
+}
 function guessSystem(file, dirHint) {
   const ext = path.extname(file).toLowerCase();
   const cands = [...(ALL_EXT[ext] || [])];
   if (!cands.length) return null;
   if (cands.length === 1) return cands[0];
   const hint = dirHint.toLowerCase();
-  for (const s of cands) if (hint.includes(s) || hint.includes(SYSTEMS[s].toLowerCase())) return s;
+  const fromDir = sysFromDir(dirHint); if (fromDir && cands.includes(fromDir)) return fromDir;
+  for (const s of cands) if (hint.includes(SYSTEMS[s].toLowerCase())) return s;
   if (/gamecube|\bgc\b/.test(hint)) return cands.includes('gc') ? 'gc' : cands[0];
   if (/\bps2\b|playstation 2/.test(hint)) return cands.includes('ps2') ? 'ps2' : cands[0];
   if (/\bps1\b|\bpsx\b/.test(hint)) return cands.includes('ps1') ? 'ps1' : cands[0];
@@ -239,10 +258,17 @@ async function scanDir(dir, out, unsorted, forcedSys) {
     if (e.isDirectory()) { if (!/bios|cover|firmware|^sys$|cache|shader|textures/i.test(e.name)) await scanDir(p, out, unsorted, forcedSys); continue; }
     const ext = path.extname(e.name).toLowerCase();
     if (!ALL_EXT[ext] && !/\.(7z|zip|rar)$/i.test(e.name)) continue;
+    if (ARCHIVE_EXT.test(e.name) && ents.some(x => x.name !== e.name && !/\.(7z|zip|rar)$/i.test(x.name) && x.name.toLowerCase().replace(/\.[^.]+$/, '') === e.name.toLowerCase().replace(/\.(7z|zip|rar)$/i, ''))) continue; // extracted copy is right there
+    if (ARCHIVE_EXT.test(e.name)) {
+      // archived carts: fine when the folder says which system and that system's emulator reads archives
+      const asys = forcedSys || sysFromDir(p);
+      if (asys && ARCHIVE_SYS.has(asys)) { out.push({ path: p, sys: asys, title: titleFromFile(e.name), file: e.name }); continue; }
+    }
     if (/\.(7z|zip|rar)$/i.test(e.name)) {
       // an archive next to an extracted copy of the same game is just clutter, skip it quietly
       const stem = e.name.replace(/\.(7z|zip|rar)$/i, '').toLowerCase();
-      if (ents.some(x => x.name.toLowerCase().startsWith(stem) && x.name !== e.name)) continue;
+      // exact stem only: "Metroid (USA).7z" must not be hidden by "Metroid (USA) (Virtual Console).7z"
+      if (ents.some(x => x.name !== e.name && !/\.(7z|zip|rar)$/i.test(x.name) && x.name.toLowerCase().replace(/\.[^.]+$/, '') === stem)) continue;
       unsorted.push({ path: p, why: 'archive, extract it first' }); continue;
     }
     // .iso next to a .cue/.mds of the same name is the same disc
@@ -259,15 +285,33 @@ async function scanLibrary() {
   const found = [], unsorted = [];
   for (const rd of config.romDirs) await scanDir(rd.path, found, unsorted, rd.system || null);
   // merge: keep playtime etc for games we already knew
+  // same title+system more than once (regions, .iso + .xiso.iso): one card, best release wins, the rest kept as variants.
+  // a game you already played/favourited stays the pick so its saves and playtime don't jump to another file.
+  const groups = new Map();
+  for (const f of found) { const k = f.sys + '\0' + f.title.toLowerCase(); (groups.get(k) || groups.set(k, []).get(k)).push(f); }
   const games = {};
-  for (const f of found) {
-    // same title+system twice (e.g. .iso and .xiso.iso of one game): keep the first
-    if (Object.values(games).some(g => g.sys === f.sys && g.title.toLowerCase() === f.title.toLowerCase())) continue;
-    const old = library.games[f.path] || {};
-    games[f.path] = { ...old, ...f, id: f.path, playtime: old.playtime || 0, lastPlayed: old.lastPlayed || null, fav: !!old.fav, art: old.art || findLocalArt(f) };
+  for (const fs_ of groups.values()) {
+    const known = fs_.find(f => library.games[f.path]?.playtime || library.games[f.path]?.fav);
+    const pick = known || fs_.slice().sort((a, b) => releaseRank(a.file) - releaseRank(b.file) || a.file.localeCompare(b.file))[0];
+    const old = library.games[pick.path] || {};
+    const variants = fs_.filter(f => f !== pick).map(f => f.path);
+    games[pick.path] = { ...old, ...pick, id: pick.path, playtime: old.playtime || 0, lastPlayed: old.lastPlayed || null, fav: !!old.fav, art: old.art || findLocalArt(pick), ...(variants.length ? { variants } : { variants: undefined }) };
   }
   library.games = games; library.unsorted = unsorted; saveLibrary();
   return snapshot();
+}
+// lower is better: USA/World first (60Hz, english), then Europe, then Japan; verified dumps over revisions/betas/hacks
+function releaseRank(file) {
+  const f = file.toLowerCase();
+  // no-intro region tag: the first (...) group made only of region names, e.g. "(Japan, USA)" or "(Europe)"
+  const REG = /^(usa|world|europe|japan|uk|australia|canada|brazil|korea|china|france|germany|spain|italy|asia|netherlands|sweden|taiwan|hong kong|russia|scandinavia)$/;
+  const tag = (f.match(/\(([^()]+)\)/g) || []).map(t => t.slice(1, -1).split(/,\s*/)).find(parts => parts.every(p => REG.test(p.trim()))) || [];
+  const has = r => tag.some(p => p.trim() === r);
+  let r = has('usa') || has('world') ? 0 : has('europe') || has('uk') || has('australia') || has('canada') ? 10 : has('japan') ? 20 : tag.length ? 30 : 40;
+  if (/\(rev \d+\)/.test(f)) r -= 1;                       // later revision of the same region = bug fixes
+  if (/\((beta|proto|demo|sample|pirate|hack|unl)/.test(f) || /\[(b|h|t|o)\d*\]/.test(f)) r += 100;
+  if (/\.xiso\./.test(f)) r += 1;
+  return r;
 }
 function findLocalArt(g) {
   // art/<system>/<title>.(png|jpg) if the user (or scraper) put it there
@@ -283,8 +327,8 @@ function emuFolders(id, e) {
   const out = [{ label: plat.isFlatpak(e.exe) ? 'flatpak sandbox' : 'program', path: plat.programDir(e.exe) }];
   if (e.dataDir) out.push({ label: 'config / data', path: e.dataDir });
   const fill = s => s.replace('{data}', e.dataDir || '').replace('{exe}', plat.programDir(e.exe));
-  for (const [sys, sv] of Object.entries(r.saves || {})) if (sv !== 'hdd-image') { const p = fill(sv); if (fs.existsSync(p)) out.push({ label: `saves (${SYSTEMS[sys] || sys})`, path: p }); }
-  for (const [sys, st] of Object.entries(r.states || {})) { const p = fill(st); if (fs.existsSync(p)) out.push({ label: `save states (${SYSTEMS[sys] || sys})`, path: p }); }
+  for (const [sys, sv] of Object.entries(r.saves || {})) if (sv !== 'hdd-image') { const p = fill(sv); if (fs.existsSync(p)) out.push({ label: sys === '*' ? 'saves' : `saves (${SYSTEMS[sys] || sys})`, path: p }); }
+  for (const [sys, st] of Object.entries(r.states || {})) { const p = fill(st); if (fs.existsSync(p)) out.push({ label: sys === '*' ? 'save states' : `save states (${SYSTEMS[sys] || sys})`, path: p }); }
   for (const b of r.bios || []) { const p = fill(b); if (fs.existsSync(p)) out.push({ label: 'bios', path: p }); }
   return out;
 }
@@ -335,8 +379,11 @@ function launch(gameId) {
   if (!emu || !emu.exe) return { error: `no emulator set up for ${SYSTEMS[g.sys]}` };
   // snapshot whatever saves exist right now, so this session can always be rolled back (skipped if unchanged)
   const before = safeSnapshot(g, { reason: 'before-play' });
-  const argsTpl = g.args || emu.recipe.args[g.sys] || ['{rom}'];
-  const args = argsTpl.map(a => a.replace('{rom}', g.path).replace('{dir}', plat.programDir(emu.exe)));
+  const argsTpl = g.args || emu.recipe.args[g.sys] || emu.recipe.args['*'] || ['{rom}'];
+  const core = emu.recipe.cores?.[g.sys];
+  if (argsTpl.some(a => a.includes('{core}')) && !core) return { error: `${emu.recipe.name} has no core picked for ${SYSTEMS[g.sys]}` };
+  const coreFile = core && `${core}_libretro.${plat.OS === 'win' ? 'dll' : 'so'}`; // bare name: retroarch looks it up in libretro_directory
+  const args = argsTpl.map(a => a.replace('{rom}', g.path).replace('{dir}', plat.programDir(emu.exe)).replace('{core}', coreFile || ''));
   const started = Date.now();
   let child;
   // flatpak emulators get the rom folder punched into their sandbox (read-only)
@@ -470,7 +517,7 @@ if (plat.OS === 'linux') app.commandLine.appendSwitch('enable-features', 'Global
 app.whenReady().then(() => { if (!process.argv.includes('--smoke')) { createWindow(); startGuideHook(); } });
 app.on('window-all-closed', () => app.quit());
 app.on('will-quit', () => { globalShortcut.unregisterAll(); stopGuideHook(); });
-module.exports = { library, saveCtx, launch, detectEmulators, scanLibrary, snapshot, config, saveConfig, recipes, resolveDataDir, recipeForExe, isEmulatorFile, ROOT };
+module.exports = { library, saveCtx, launch, killRunning, detectEmulators, scanLibrary, snapshot, config, saveConfig, recipes, resolveDataDir, recipeForExe, isEmulatorFile, ROOT };
 
 // ---------- ipc
 ipcMain.handle('snapshot', () => snapshot());

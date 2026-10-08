@@ -1,0 +1,49 @@
+{
+  "id": "retroarch",
+  "name": "RetroArch",
+  "systems": ["nes", "snes", "genesis", "sms", "gg", "gb", "gba", "n64"],
+  "exe": {
+    "win": ["retroarch.exe"],
+    "linux": ["retroarch", "RetroArch*.AppImage"]
+  },
+  "flatpak": "org.libretro.RetroArch",
+  "cores": {
+    "nes": "mesen",
+    "snes": "snes9x",
+    "genesis": "genesis_plus_gx",
+    "sms": "genesis_plus_gx",
+    "gg": "genesis_plus_gx",
+    "gb": "mgba",
+    "gba": "mgba",
+    "n64": "mupen64plus_next"
+  },
+  "archives": true,
+  "extensions": {
+    "nes": [".nes", ".fds", ".unf", ".7z", ".zip"],
+    "snes": [".sfc", ".smc", ".swc", ".fig", ".7z", ".zip"],
+    "genesis": [".md", ".gen", ".smd", ".7z", ".zip"],
+    "sms": [".sms", ".7z", ".zip"],
+    "gg": [".gg", ".7z", ".zip"],
+    "gb": [".gb", ".gbc", ".7z", ".zip"],
+    "gba": [".gba", ".7z", ".zip"],
+    "n64": [".z64", ".n64", ".v64", ".7z", ".zip"]
+  },
+  "args": {
+    "*": ["-f", "-L", "{core}", "{rom}"]
+  },
+  "dataDirs": {
+    "win": ["{exe}"],
+    "linux": ["{var}/config/retroarch", "{xdg_config}/retroarch"]
+  },
+  "saves": { "*": "{data}/saves" },
+  "states": { "*": "{data}/states" },
+  "bios": ["{data}/system"],
+  "source": {
+    "url": "https://github.com/libretro/RetroArch/blob/master/retroarch.c",
+    "checked": "2026-10-07",
+    "note": "-L <name>_libretro.so|dll: a bare core filename is looked up in libretro_directory (retroarch.c core path resolution), so the same args work for the flatpak, native and windows builds. 7z/zip are opened natively. -f = fullscreen",
+    "saves": "runloop.c: savefile_directory (empty or savefiles_in_content_dir -> next to the rom), sort_savefiles_enable (default true) appends the core's library_name, sort_savefiles_by_content appends the rom's folder name. file = <rom name without ext>.srm (+ .rtc). archives use the inner file's name.",
+    "cores": "corenames from libretro-core-info: Mesen, Snes9x, Genesis Plus GX, mGBA, Mupen64Plus-Next. linux cores downloaded from buildbot.libretro.com/nightly/linux/x86_64/latest",
+    "linuxChecked": "2026-10-07"
+  }
+}
