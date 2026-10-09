@@ -117,7 +117,10 @@ test('archived carts: .7z in a system folder scans for retroarch systems; nes no
   assert.strictEqual(sysOf('Metroid'), 'nes');
   assert.strictEqual(sysOf('Advance Wars'), 'gba');
   const metroids = Object.values(M.library.games).filter(g => g.title.startsWith('Metroid'));
-  assert.strictEqual(metroids.length, 2, 'a longer variant name must not hide the original release');
+  assert.strictEqual(metroids.length, 1, 'virtual console re-release merges into the same card');
+  assert.strictEqual(metroids[0].file, 'Metroid (USA).zip', 'the original cart is the pick, not the VC rip');
+  assert.strictEqual(metroids[0].variants?.length, 1, 'VC copy kept as a variant (exact-stem archive skip did not eat it)');
+  assert.strictEqual(metroids[0].name, 'Metroid');
   const chrono = Object.values(M.library.games).filter(g => g.title === 'Chrono Trigger');
   assert.deepStrictEqual(chrono.map(g => g.file), ['Chrono Trigger (USA).sfc'], 'extracted copy wins over its archive');
   assert.strictEqual(sysOf('Devil May Cry'), undefined, 'ps2 zip still needs extracting (pcsx2 cannot read zip)');

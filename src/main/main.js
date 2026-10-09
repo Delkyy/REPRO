@@ -39,6 +39,7 @@ const writeJson = (p, v) => fs.writeFileSync(p, JSON.stringify(v, null, 2));
 
 let config = readJson(P.config, { emulators: {}, romDirs: [], mode: 'desktop', ui: 'desk', theme: 'billet', views: [], panels: { side: true, detail: true }, cardSize: 150, hubKey: 'Ctrl+Alt+H', igdb: {} });
 let library = readJson(P.library, { games: {} }); // keyed by rom path
+const titles = require('./titles');
 const saveConfig = () => writeJson(P.config, config);
 const saveLibrary = () => writeJson(P.library, library);
 
@@ -289,14 +290,18 @@ async function scanLibrary() {
   // same title+system more than once (regions, .iso + .xiso.iso): one card, best release wins, the rest kept as variants.
   // a game you already played/favourited stays the pick so its saves and playtime don't jump to another file.
   const groups = new Map();
-  for (const f of found) { const k = f.sys + '\0' + f.title.toLowerCase(); (groups.get(k) || groups.set(k, []).get(k)).push(f); }
+  for (const f of found) { f.disp = titles.parse(f.file); const k = f.sys + '\0' + (f.disp.group || f.title.toLowerCase()); (groups.get(k) || groups.set(k, []).get(k)).push(f); }
   const games = {};
   for (const fs_ of groups.values()) {
     const known = fs_.find(f => library.games[f.path]?.playtime || library.games[f.path]?.fav);
-    const pick = known || fs_.slice().sort((a, b) => releaseRank(a.file) - releaseRank(b.file) || a.file.localeCompare(b.file))[0];
+    // retail beats junk, then region/revision. a card is junk only if EVERY copy is junk (Addams Family beta rides along as a variant)
+    const pick = known || fs_.slice().sort((a, b) => (a.disp.junk - b.disp.junk) || releaseRank(a.file) - releaseRank(b.file) || a.file.localeCompare(b.file))[0];
     const old = library.games[pick.path] || {};
     const variants = fs_.filter(f => f !== pick).map(f => f.path);
-    games[pick.path] = { ...old, ...pick, id: pick.path, playtime: old.playtime || 0, lastPlayed: old.lastPlayed || null, fav: !!old.fav, art: old.art || findLocalArt(pick), ...(variants.length ? { variants } : { variants: undefined }) };
+    const { disp, ...pk } = pick;
+    // if the pick moved to another copy of the same game (new merge rules), its cover comes along
+    const chips = pick.disp.chips;
+    games[pick.path] = { ...old, ...pk, name: disp.name, sort: disp.sort, kind: disp.kind || undefined, junk: disp.junk || undefined, chips: chips.length ? chips : undefined, id: pick.path, playtime: old.playtime || 0, lastPlayed: old.lastPlayed || null, fav: !!old.fav, art: old.art || fs_.map(f => library.games[f.path]?.art).find(Boolean) || findLocalArt(pick), ...(variants.length ? { variants } : { variants: undefined }) };
   }
   library.games = games; library.unsorted = unsorted; saveLibrary();
   if (app.isReady?.() && !process.env.REPRO_NO_COVERS) setTimeout(() => startCovers(), 1500); // background, never blocks the scan
@@ -313,6 +318,7 @@ function releaseRank(file) {
   if (/\(rev \d+\)/.test(f)) r -= 1;                       // later revision of the same region = bug fixes
   if (/\((beta|proto|demo|sample|pirate|hack|unl)/.test(f) || /\[(b|h|t|o)\d*\]/.test(f)) r += 100;
   if (/\.xiso\./.test(f)) r += 1;
+  if (/\((virtual console|switch online|[^)]*collection|[^)]*classics|[^)]*mini|sega channel|lodgenet|np)[^)]*\)/.test(f)) r += 2; // original cart over the VC/collection rip
   return r;
 }
 function findLocalArt(g) {
@@ -336,7 +342,13 @@ function emuFolders(id, e) {
 }
 // what the renderer needs per game. bookkeeping (artFrom, artTried, variants list) stays in main: ~6.5MB -> ~4MB per refresh.
 const SLIM_DROP = new Set(['artFrom', 'artTried', 'variants']);
+function withName(g) {
+  if (g.name == null && g.file) { const d = titles.parse(g.file); g.name = d.name; g.sort = d.sort; if (d.kind) g.kind = d.kind; if (d.junk) g.junk = true; }
+  return g;
+}
+for (const g of Object.values(library.games)) withName(g);
 function slimGame(g) {
+  withName(g);
   const o = {}; for (const k in g) if (!SLIM_DROP.has(k) && g[k] != null) o[k] = g[k];
   if (g.variants?.length) o.nVariants = g.variants.length;
   return o;
@@ -346,7 +358,7 @@ function snapshot() {
   for (const [id, e] of Object.entries(config.emulators)) emus[id] = { ...e, name: recipes[id]?.name || id, systems: recipes[id]?.systems || [], exeDir: plat.programDir(e.exe), flatpak: plat.isFlatpak(e.exe), folders: emuFolders(id, e) };
   function readThemeDir(base) { try { return fs.readdirSync(base).filter(d => fs.existsSync(path.join(base, d, 'theme.json'))).map(d => ({ id: d, ...readJson(path.join(base, d, 'theme.json'), {}), base })); } catch { return []; } }
   const themes = [...readThemeDir(P.themes), ...(ROOT !== BUNDLE ? readThemeDir(path.join(ROOT, 'themes')) : [])].reduce((a, t) => { a[t.id] = t; return a; }, {});
-  return { games: Object.values(library.games).map(slimGame), unsorted: library.unsorted || [], emulators: emus, systems: SYSTEMS, sysdb: SYSDB, root: ROOT, bundle: BUNDLE, themes: Object.values(themes), recipeArgs: Object.fromEntries(Object.entries(recipes).map(([k, r]) => [k, r.args])), os: plat.OS, config: { mode: config.mode, ui: config.ui, theme: config.theme, romDirs: config.romDirs, views: config.views || [], panels: config.panels || { side: true, detail: true }, cardSize: config.cardSize || 150, hubKey: config.hubKey || 'Ctrl+Alt+H', hubKeyOk: hubKeyOk } };
+  return { games: Object.values(library.games).map(slimGame), unsorted: library.unsorted || [], emulators: emus, systems: SYSTEMS, sysdb: SYSDB, root: ROOT, bundle: BUNDLE, themes: Object.values(themes), recipeArgs: Object.fromEntries(Object.entries(recipes).map(([k, r]) => [k, r.args])), os: plat.OS, config: { mode: config.mode, ui: config.ui, theme: config.theme, romDirs: config.romDirs, views: config.views || [], panels: config.panels || { side: true, detail: true }, cardSize: config.cardSize || 150, hubKey: config.hubKey || 'Ctrl+Alt+H', hubKeyOk: hubKeyOk, hideJunk: config.hideJunk !== false } };
 }
 // duplicates: same title across different systems isn't a dupe, but same title+sys with a different path is
 function findDuplicates() {

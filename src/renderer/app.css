@@ -371,3 +371,4 @@ input[type=range]{accent-color:var(--accent)}
 #items.vlist .vrow{position:absolute;left:0;right:0;display:flex;align-items:flex-end;gap:14px}
 #items.vlist .vrow.list{align-items:stretch}
 #items.vlist .vrow.list .lrow{flex:1;height:58px;box-sizing:border-box}
+.icon.junk.on{color:var(--accent);border-color:var(--accent)}

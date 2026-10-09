@@ -16,11 +16,14 @@ const logo = k => `<i class="lg" style="--m:url('${fileUrl(BUNDLE + '/assets/sys
 const emuFor = k => Object.entries(S.emulators).find(([id, e]) => e.systems?.includes(k))?.[1];
 const emuName = k => emuFor(k)?.name || 'no emulator';
 const hasEmu = k => !!emuFor(k)?.exe;
-const byId = id => S.games.find(g => g.id === id);
+const nm = g => g.name || g.title;                       // display name ("The Legend of Zelda"), g.title stays the save key
+const sortKey = g => g.sort || nm(g).toLowerCase();
+const byName = (a, b) => sortKey(a).localeCompare(sortKey(b));
+const byId = id => (S.all || S.games).find(g => g.id === id);
 const played = () => S.games.filter(g => g.lastPlayed).sort((a, b) => b.lastPlayed - a.lastPlayed);
 let tt; function toast(h) { const t = $('#toast'); t.innerHTML = h; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 3000); }
 
-function artEl(g) { return g.art ? `<img src="${fileUrl(g.art)}" alt="" decoding="async">` : `<div class="noart">${logo(g.sys)}${esc(g.title)}<small>no art yet</small></div>`; }
+function artEl(g) { return g.art ? `<img src="${fileUrl(g.art)}" alt="" decoding="async">` : `<div class="noart">${logo(g.sys)}${esc(nm(g))}<small>no art yet</small></div>`; }
 // ---------- shelf cards: store top bar colored from the cover, card shaped like the real box
 const SHORT = { nes: 'NES', snes: 'SNES', n64: 'N64', gc: 'GAMECUBE', wii: 'WII', wiiu: 'WII U', switch: 'SWITCH', gb: 'GAME BOY', gbc: 'GB COLOR', gba: 'GBA', ds: 'DS', '3ds': '3DS', ps1: 'PS1', ps2: 'PS2', ps3: 'PS3', ps4: 'PS4', ps5: 'PS5', psp: 'PSP', vita: 'VITA', xbox: 'XBOX', x360: 'XBOX 360', xone: 'XBOX ONE', xsx: 'SERIES X|S', genesis: 'GENESIS', sms: 'MASTER SYS', gg: 'GAME GEAR', segacd: 'SEGA CD', '32x': '32X', saturn: 'SATURN', dc: 'DREAMCAST', tg16: 'TG-16', atari2600: '2600', arcade: 'ARCADE', pc: 'PC' };
 const REGION = f => { const m = (f || '').match(/\((USA|World|Europe|Japan)[,)]/i) || (f || '').match(/\((?:[^()]*, )?(USA|Europe|Japan)\)/i); return m ? ({ usa: 'USA', world: 'WORLD', europe: 'EUR', japan: 'JPN' })[m[1].toLowerCase()] : ''; };
@@ -34,15 +37,15 @@ function shelfCard(g) {
   const ar = kind === 'box' ? Math.min(1.5, Math.max(0.62, g.artAR || 0.72)) : 0.8;
   const vars = `--ar:${ar};--bc:${g.artColor || sysColor(g.sys) || '#2a2a30'};--bi:${g.artInk || '#fff'};--sysc:${sysColor(g.sys) || 'var(--accent)'}`;
   const body = kind === 'box' ? `<img src="${fileUrl(g.art)}" alt="" loading="lazy" decoding="async">`
-    : kind === 'title' ? `<div class="ts"><img src="${fileUrl(g.art)}" alt="" loading="lazy" decoding="async"></div><div class="tl">${esc(g.title)}</div>`
-    : `<div class="na"><b>${esc(g.title)}</b></div>`;
+    : kind === 'title' ? `<div class="ts"><img src="${fileUrl(g.art)}" alt="" loading="lazy" decoding="async"></div><div class="tl">${esc(nm(g))}</div>`
+    : `<div class="na"><b>${esc(nm(g))}</b></div>`;
   return `<div class="card shelf k-${kind} ${sel == g.id ? 'sel' : ''}" data-id="${esc(g.id)}" style="${vars}">${barEl(g)}<div class="cart">${body}</div>${g.fav ? '<span class="fav">★</span>' : ''}${g.emulator ? '<span class="badge">ALT EMU</span>' : ''}
       ${g.playtime ? `<div class="pb"><i style="width:${Math.min(100, g.playtime / 36)}%"></i></div>` : ''}
-      <div class="over"><b>${esc(g.title)}</b><div class="acts"><button class="p" data-play="${esc(g.id)}">▶ Play</button><button class="cog" data-cog="${esc(g.id)}" title="settings">⚙</button></div></div></div>`;
+      <div class="over"><b>${esc(nm(g))}</b><div class="acts"><button class="p" data-play="${esc(g.id)}">▶ Play</button><button class="cog" data-cog="${esc(g.id)}" title="settings">⚙</button></div></div></div>`;
 }
 
 /* ---------- saved views: {id,name,filter:{sys,fav,q}} ---------- */
-function matchView(g, v) { if (v.sys && g.sys !== v.sys) return false; if (v.fav && !g.fav) return false; if (v.q && !g.title.toLowerCase().includes(v.q.toLowerCase())) return false; return true; }
+function matchView(g, v) { if (v.sys && g.sys !== v.sys) return false; if (v.fav && !g.fav) return false; if (v.q && !(nm(g) + ' ' + g.title).toLowerCase().includes(v.q.toLowerCase())) return false; return true; }
 
 /* ---------- sidebar ---------- */
 function renderSide() {
@@ -84,13 +87,13 @@ async function saveCurrentView() {
 /* ---------- main: grid / list / empty / unsorted / emulator page ---------- */
 function list() {
   const q = ($('#q').value || '').toLowerCase();
-  let l = S.games.filter(g => !q || g.title.toLowerCase().includes(q));
+  let l = S.games.filter(g => !q || nm(g).toLowerCase().includes(q) || g.title.toLowerCase().includes(q));
   if (filter == 'fav') l = l.filter(g => g.fav);
   else if (filter == 'recent') l = played().slice(0, 8);
   else if (S.systems[filter]) l = l.filter(g => g.sys == filter);
   else if (filter.startsWith('v:')) { const v = (S.config.views || []).find(x => x.id == filter.slice(2)); if (v) l = l.filter(g => matchView(g, v)); }
   else if (filter.startsWith('e:')) { const sysList = S.emulators[filter.slice(2)]?.systems || []; l = l.filter(g => sysList.includes(g.sys)); }
-  return l.sort((a, b) => filter == 'recent' ? 0 : a.title.localeCompare(b.title));
+  return filter == 'recent' ? l : l.sort(byName);
 }
 // ---------- virtualized library: cards are packed into rows in js (widths come from each box's shape), and only
 // the rows near the viewport exist in the DOM. 11k cards used to mean 11k <img>s laid out on every click.
@@ -117,7 +120,7 @@ function packRows(l, width, mode) {
 function listRow(g) {
   return `<div class="lrow ${sel == g.id ? 'sel' : ''}" data-id="${esc(g.id)}" ${sysc(g.sys)}>
       <div class="th">${g.art ? `<img src="${fileUrl(g.art)}" loading="lazy" decoding="async">` : ''}</div>${logo(g.sys)}
-      <span class="t">${esc(g.title)}</span>${g.fav ? '<span class="fav">★</span>' : ''}<span class="m">${fmtPt(g.playtime)}</span></div>`;
+      <span class="t">${esc(nm(g))}</span>${g.fav ? '<span class="fav">★</span>' : ''}<span class="m">${fmtPt(g.playtime)}</span></div>`;
 }
 function vlPaint(force) {
   if (!VL) return;
@@ -237,12 +240,12 @@ function renderDetail() {
         <span>rom</span><code title="${esc(g.path)}">${esc(g.file)}</code>
       </div>
       <div class="btnrow"><button id="lSave">save</button>${g.emulator ? `<button id="lReset">reset to default</button>` : ''}</div>`,
-    info: `<div class="kv"><span>title</span><code>${esc(g.title)}</code><span>system</span><code>${esc(sysName(g.sys))}</code><span>file</span><code title="${esc(g.path)}">${esc(g.file)}</code></div>
+    info: `<div class="kv"><span>title</span><code>${esc(nm(g))}</code><span>system</span><code>${esc(sysName(g.sys))}</code><span>file</span><code title="${esc(g.path)}">${esc(g.file)}</code></div>
       <div class="hint" style="margin-top:10px">metadata scraping is milestone 5.</div>`,
   };
   $('#detail').innerHTML = `
    <div class="banner" ${sysc(g.sys)}>${g.art ? `<div class="bd" style="background-image:url('${fileUrl(g.art)}')"></div>` : ''}${logo(g.sys)}<button class="icon cog" id="dCog">⚙</button></div>
-   <div class="head"><div class="cover">${g.art ? `<img src="${fileUrl(g.art)}">` : ''}</div><h3>${esc(g.title)}</h3></div>
+   <div class="head"><div class="cover">${g.art ? `<img src="${fileUrl(g.art)}">` : ''}</div><h3>${esc(nm(g))}</h3></div>
    <div class="playbar"><button class="play" id="dPlay" ${ok ? '' : 'disabled'}>▶ Play${ok ? '' : ' (no emulator)'}</button>
      <div class="st"><span>last played</span><b>${fmtLast(g.lastPlayed)}</b></div><div class="st"><span>playtime</span><b>${g.playtime ? fmtPt(g.playtime) : 'not yet'}</b></div></div>
    <div class="links"><button id="dFav">★ ${g.fav ? 'unfavorite' : 'favorite'}</button><button id="dFolder">▣ folder</button><button id="dTabSaves">⛁ saves</button><button id="dTabLaunch2">⛭ launch</button></div>
@@ -323,13 +326,13 @@ async function loadSavesTab(g) {
     if (r.error) toast(`<b>error:</b> ${esc(r.error)}`); else { toast('deleted'); loadSavesTab(g); }
   });
 }
-async function launch(id) { const g = byId(id); const r = await repro.launch(id); if (r.error) return toast(`<b>can't launch:</b> ${esc(r.error)}`); toast(`launching <b>${esc(g.title)}</b>`); }
+async function launch(id) { const g = byId(id); const r = await repro.launch(id); if (r.error) return toast(`<b>can't launch:</b> ${esc(r.error)}`); toast(`launching <b>${esc(nm(g))}</b>`); }
 async function scrapeOne(id) {
-  const g = byId(id); toast(`scraping art for <b>${esc(g.title)}</b>…`);
+  const g = byId(id); toast(`scraping art for <b>${esc(nm(g))}</b>…`);
   const r = await repro.scrapeOne(id);
   if (r.error) return toast(`<b>scrape failed:</b> ${esc(r.error)}`);
   Object.assign(g, { art: r.artPath || g.art, desc: r.desc || g.desc, year: r.year || g.year });
-  toast(r.artPath ? `got art for <b>${esc(g.title)}</b>` : `no art found for <b>${esc(g.title)}</b> — try IGDB credentials in Settings`);
+  toast(r.artPath ? `got art for <b>${esc(nm(g))}</b>` : `no art found for <b>${esc(nm(g))}</b> — try IGDB credentials in Settings`);
   renderAll();
 }
 let coverToastAt = 0;
@@ -337,7 +340,7 @@ repro.onCoversProgress(async d => {
   if (d.finished) { S = await repro.snapshot(); renderAll(); toast(`box art: <b>${d.got}</b> new covers`); return; }
   if (Date.now() - coverToastAt > 4000) { coverToastAt = Date.now(); toast(`fetching box art… ${d.done}/${d.total} (${d.got} found)`); if (d.got && d.done % 600 < 40) { S = await repro.snapshot(); renderMain(); } }
 });
-repro.onGameExited(async ({ gameId, secs, saved }) => { await refresh(); const g = byId(gameId); toast(`back. <b>${esc(g?.title)}</b>, ${fmtPt(secs)} this session.${saved ? ' save snapshotted.' : ''}`); });
+repro.onGameExited(async ({ gameId, secs, saved }) => { await refresh(); const g = byId(gameId); toast(`back. <b>${esc(g ? nm(g) : '')}</b>, ${fmtPt(secs)} this session.${saved ? ' save snapshotted.' : ''}`); });
 
 /* ---------- couch mode (ported from sketch 001) ---------- */
 // couch rows are windowed: each strip holds ~50 tiles around its column, spacer margins keep every tile's offsetLeft
@@ -348,7 +351,7 @@ let cData = [], cRowStart = [], cRowCol = [];
 let bgFlip = false;
 function renderCouch() {
   const rows = []; const cont = played().slice(0, 8); if (cont.length) rows.push({ k: 'continue', n: 'Continue', items: cont });
-  for (const k of Object.keys(S.systems)) { const it = S.games.filter(g => g.sys == k).sort((a, b) => a.title.localeCompare(b.title)); if (it.length) rows.push({ k, n: sysName(k), items: it }); }
+  for (const k of Object.keys(S.systems)) { const it = S.games.filter(g => g.sys == k).sort(byName); if (it.length) rows.push({ k, n: sysName(k), items: it }); }
   cList = []; cRows = []; cRowStart = [];
   rows.forEach((r, ri) => { cRowStart[ri] = cList.length; for (const g of r.items) { cList.push(g.id); cRows.push(ri); } });
   cRowCol = rows.map((r, ri) => Math.min(cRowCol[ri] || 0, r.items.length - 1));
@@ -389,7 +392,7 @@ function cSetFocus(i) {
   strip.style.transform = `translateX(-${Math.min(maxX, Math.max(0, t.offsetLeft - pad - t.offsetWidth * 0.07))}px)`;
   const g = byId(cList[cFocus]);
   const h = $('#chero'); h.classList.remove('swap'); void h.offsetWidth; h.classList.add('swap'); h.setAttribute('style', sysStyle(g.sys));
-  h.innerHTML = `<div class="sys">${logo(g.sys)}${esc(sysName(g.sys))} · ${esc(emuName(g.sys))}</div><h1>${esc(g.title)}</h1><div class="meta"><span>${fmtPt(g.playtime)} played</span><span>last: ${fmtLast(g.lastPlayed)}</span>${g.fav ? '<span>★</span>' : ''}${g.year ? `<span>${g.year}</span>` : ''}</div>${g.desc ? `<div class="desc">${esc(g.desc)}</div>` : ''}<div class="hint"><span class="p">▶ Play</span><span>★</span></div>`;
+  h.innerHTML = `<div class="sys">${logo(g.sys)}${esc(sysName(g.sys))} · ${esc(emuName(g.sys))}</div><h1>${esc(nm(g))}</h1><div class="meta"><span>${fmtPt(g.playtime)} played</span><span>last: ${fmtLast(g.lastPlayed)}</span>${g.fav ? '<span>★</span>' : ''}${g.year ? `<span>${g.year}</span>` : ''}</div>${g.desc ? `<div class="desc">${esc(g.desc)}</div>` : ''}<div class="hint"><span class="p">▶ Play</span><span>★</span></div>`;
   const a = $('#bgA'), b = $('#bgB'), nxt = bgFlip ? a : b, cur = bgFlip ? b : a; bgFlip = !bgFlip;
   nxt.style.backgroundImage = g.art ? `url("${fileUrl(g.art)}")` : 'none';
   nxt.classList.add('on'); cur.classList.remove('on');
@@ -403,7 +406,7 @@ $('#crows').addEventListener('click', e => { const t = e.target.closest('.ctile[
 function cOpen() {
   const g = byId(cList[cFocus]); if (!g) return;
   $('#cov').innerHTML = `<div class="box" ${sysc(g.sys)}>${g.art ? `<img class="big" src="${fileUrl(g.art)}">` : `<div class="noart">no art yet</div>`}
-   <div class="body"><h2>${esc(g.title)}</h2><div class="meta" style="display:flex;gap:14px;color:var(--muted);font-size:13px">${logo(g.sys)}<span>${esc(sysName(g.sys))}</span><span>${fmtPt(g.playtime)} played</span><span>${esc(emuName(g.sys))}</span></div>
+   <div class="body"><h2>${esc(nm(g))}</h2><div class="meta" style="display:flex;gap:14px;color:var(--muted);font-size:13px">${logo(g.sys)}<span>${esc(sysName(g.sys))}</span><span>${fmtPt(g.playtime)} played</span><span>${esc(emuName(g.sys))}</span></div>
    <div class="big-btns"><button class="btn p" id="ovPlay">▶ Play</button><button class="btn" id="ovFav">★</button></div></div></div>`;
   $('#ovPlay').onclick = () => { launch(g.id); $('#cov').classList.remove('open'); };
   $('#ovFav').onclick = () => toggleFav(g.id);
@@ -693,7 +696,7 @@ async function renderGuideRight(g) {
       <h4>${esc(sysName(g?.sys||''))} · ${esc(emuName(g?.sys||''))}</h4>
       <div class="game-card">
         <div class="cover">${g?.art ? `<img src="${fileUrl(g.art)}">` : ''}</div>
-        <div><h3>${esc(g?.title||'no game')}</h3><div class="meta">${fmtPt(g?.playtime)} played · last ${fmtDate(g?.lastPlayed)}</div></div>
+        <div><h3>${esc(g ? nm(g) : 'no game')}</h3><div class="meta">${fmtPt(g?.playtime)} played · last ${fmtDate(g?.lastPlayed)}</div></div>
       </div>
       <button class="gbtn primary focus" data-action="play"><span class="k">A</span>Resume / Play</button>
       <button class="gbtn" data-action="saves"><span class="k">Y</span>Save slots</button>
@@ -706,7 +709,7 @@ async function renderGuideRight(g) {
     guideSlotsCache = slots;
     const fmtSlot = sl => slotTitle(sl);
     el.innerHTML = `
-      <h4>Save slots — ${esc(g?.title||'')}</h4>
+      <h4>Save slots — ${esc(g ? nm(g) : '')}</h4>
       ${slots.length ? `<div class="slots-mini">${slots.slice(0,8).map((sl,i) => `<div class="sm" data-slot="${i}">${esc(fmtSlot(sl))}<br><span style="opacity:.6">${fmtWhen(sl.created)} · ${fmtSize(sl.size)}</span></div>`).join('')}</div>` : `<div class="meta" style="margin:10px 0">${I.live ? 'no snapshots yet.' : 'no saves yet. play the game first.'}</div>`}
       <div style="margin-top:14px"></div>
       <button class="gbtn primary focus" data-action="snapshot"><span class="k">A</span>Snapshot now</button>
@@ -768,7 +771,15 @@ function guideSectionNav(dir) {
   if (next && next.id !== guideSection) { guideSection=next.id; guideFocus=0; renderGuide(byId(cList[cFocus])); }
 }
 
-function renderAll() { renderSide(); renderMain(); renderDetail(); if (app.classList.contains('couch')) renderCouch(); }
+// S.games = what's on the shelves, S.all = everything scanned. a new snapshot replaces S, so S.all is per-snapshot.
+function applyJunk() {
+  if (!S.all) S.all = S.games;
+  const hide = S.config.hideJunk !== false;
+  S.junkCount = S.all.reduce((n, g) => n + (g.junk ? 1 : 0), 0);
+  S.games = hide ? S.all.filter(g => !g.junk) : S.all;
+  const b = $('#tJunk'); if (b) { b.classList.toggle('on', hide); b.title = hide ? `${S.junkCount} betas, protos, pirate carts, BIOS and test carts hidden. click to show` : `showing everything. click to hide ${S.junkCount} betas, protos, pirate carts, BIOS and test carts`; }
+}
+function renderAll() { applyJunk(); renderSide(); renderMain(); renderDetail(); if (app.classList.contains('couch')) renderCouch(); }
 async function refresh(showToast) {
   const rec = await repro.recoverPaths().catch(()=>({recovered:0}));
   if (rec.recovered) toast(`recovered ${rec.recovered} moved game${rec.recovered!==1?'s':''}`);
@@ -790,3 +801,4 @@ async function refresh(showToast) {
   if (c.mode == 'couch') setMode('couch');
   if (!S.games.length && !(c.romDirs || []).length) openSettings();
 })();
+$('#tJunk').onclick = async () => { S.config.hideJunk = S.config.hideJunk === false; await repro.setPref({ hideJunk: S.config.hideJunk }); VL = null; renderAll(); toast(S.config.hideJunk ? `hid <b>${S.junkCount}</b> betas, protos, pirate carts, BIOS and test carts` : `showing all <b>${S.all.length}</b> games, junk included`); };
