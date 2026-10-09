@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('repro', {
   setIgdb: call('setIgdb'), generateM3u: call('generateM3u'), scrapeStatus: call('scrapeStatus'),
   onScrapeProgress: (fn) => ipcRenderer.on('scrape-progress', (_, d) => fn(d)),
   covers: call('covers'), coversStop: call('coversStop'),
+  biosStatus: call('biosStatus'), biosInstall: call('biosInstall'), biosOpen: call('biosOpen'), biosPick: call('biosPick'),
   onCoversProgress: (fn) => ipcRenderer.on('covers-progress', (_, d) => fn(d)),
   autoScanRoms: call('autoScanRoms'), recoverPaths: call('recoverPaths'),
   onScanProgress: (fn) => ipcRenderer.on('scan-progress', (_, d) => fn(d)),

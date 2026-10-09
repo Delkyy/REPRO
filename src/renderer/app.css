@@ -377,3 +377,25 @@ input[type=range]{accent-color:var(--accent)}
 #items.vlist .vrow.list{align-items:stretch}
 #items.vlist .vrow.list .lrow{flex:1;height:58px;box-sizing:border-box}
 .icon.junk.on{color:var(--accent);border-color:var(--accent)}
+
+/* bios page */
+.bios .bdrop{border:1.5px dashed var(--line);border-radius:10px;padding:18px;margin:0 0 16px;display:flex;flex-direction:column;gap:4px;align-items:center;color:var(--muted);text-align:center}
+.bios .bdrop b{color:var(--fg);font-size:14px}
+.bios .bdrop a{color:var(--accent);cursor:pointer;text-decoration:underline}
+.bios .bcard{border:1px solid var(--line);border-radius:10px;margin:0 0 14px;background:var(--panel);border-left:4px solid var(--line)}
+.bios .bcard.need{border-left-color:#ff4d6d}
+.bios .bcard.ok{border-left-color:#3ddc97}
+.bios .bh{display:flex;align-items:center;gap:12px}
+.bios .bh .lg{width:34px;height:34px;flex:none;background:var(--fg);-webkit-mask:var(--m) center/contain no-repeat;mask:var(--m) center/contain no-repeat}
+.bios .bt{flex:1;line-height:1.3}
+.bios .bt b{font-size:15px}
+.bios .bt small{display:block;color:var(--muted);font-size:12px}
+.bios .bneed{color:#ff6b84}
+.bios .bwarn{color:#e8b04a!important}
+.bios .bdir{font-family:var(--mono);font-size:10px;color:var(--muted);margin:8px 0 10px;word-break:break-all}
+.bios .slot.bf .rg{font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:9px;background:var(--panel2);color:var(--muted);margin-left:4px}
+.bios .btag{font-family:var(--mono);font-size:11px;white-space:nowrap;color:var(--muted)}
+.bios .bf.good .btag,.bios .bf.ok .btag,.bios .bf.have .btag{color:#3ddc97}
+.bios .bf.bad .btag,.bios .bf.wrong .btag{color:#ff6b84}
+.bios .bf.good .sh,.bios .bf.ok .sh,.bios .bf.have .sh{color:#3ddc97}
+.bios .bf.bad .sh,.bios .bf.wrong .sh{color:#ff6b84}

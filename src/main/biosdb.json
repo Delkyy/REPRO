@@ -1,0 +1,897 @@
+{
+ "_source": {
+  "duckstation": "stenzek/duckstation src/core/bios.cpp s_image_info_by_hash + FindBIOSImageInDirectory (sizes 512KiB / 4MiB, md5 identifies, priority picks)",
+  "pcsx2": "PCSX2/pcsx2 pcsx2/ps2/BiosTools.cpp LoadBiosVersion (romdir RESET -> ROMVER, region = romver[4])",
+  "retroarch": "libretro/libretro-database dat/System.dat + libretro-core-info firmware lists (mgba, mesen, genesis_plus_gx, snes9x, mupen64plus_next)"
+ },
+ "duckstation": [
+  {
+   "md5": "239665b1a3dade1b5a52c06338011044",
+   "desc": "SCPH-1000, DTL-H1000 (v1.0)",
+   "ver": "1.0",
+   "region": "JPN",
+   "prio": 50,
+   "kind": "ps1"
+  },
+  {
+   "md5": "924e392ed05558ffdb115408c263dccf",
+   "desc": "SCPH-1001, 5003, DTL-H1201, H3001 (v2.2 12-04-95 A)",
+   "ver": "2.2",
+   "region": "USA",
+   "prio": 10,
+   "kind": "ps1"
+  },
+  {
+   "md5": "54847e693405ffeb0359c6287434cbef",
+   "desc": "SCPH-1002, DTL-H1002 (v2.0 05-10-95 E)",
+   "ver": "2.0",
+   "region": "EUR",
+   "prio": 10,
+   "kind": "ps1"
+  },
+  {
+   "md5": "417b34706319da7cf001e76e40136c23",
+   "desc": "SCPH-1002, DTL-H1102 (v2.1 07-17-95 E)",
+   "ver": "2.1",
+   "region": "EUR",
+   "prio": 10,
+   "kind": "ps1"
+  },
+  {
+   "md5": "e2110b8a2b97a8e0b857a45d32f7e187",
+   "desc": "SCPH-1002, DTL-H1202, H3002 (v2.2 12-04-95 E)",
+   "ver": "2.2",
+   "region": "EUR",
+   "prio": 10,
+   "kind": "ps1"
+  },
+  {
+   "md5": "ca5cfc321f916756e3f0effbfaeba13b",
+   "desc": "DTL-H1100 (v2.2 03-06-96 D)",
+   "ver": "2.2",
+   "region": "JPN",
+   "prio": 20,
+   "kind": "ps1"
+  },
+  {
+   "md5": "849515939161e62f6b866f6853006780",
+   "desc": "SCPH-3000, DTL-H1000H (v1.1 01-22-95)",
+   "ver": "1.1",
+   "region": "JPN",
+   "prio": 10,
+   "kind": "ps1"
+  },
+  {
+   "md5": "dc2b9bf8da62ec93e868cfd29f0d067d",
+   "desc": "SCPH-1001, DTL-H1001 (v2.0 05-07-95 A)",
+   "ver": "2.0",
+   "region": "USA",
+   "prio": 10,
+   "kind": "ps1"
+  },
+  {
+   "md5": "cba733ceeff5aef5c32254f1d617fa62",
+   "desc": "SCPH-3500 (v2.1 07-17-95 J)",
+   "ver": "2.1",
+   "region": "JPN",
+   "prio": 10,
+   "kind": "ps1"
+  },
+  {
+   "md5": "da27e8b6dab242d8f91a9b25d80c63b8",
+   "desc": "SCPH-1001, DTL-H1101 (v2.1 07-17-95 A)",
+   "ver": "2.1",
+   "region": "USA",
+   "prio": 10,
+   "kind": "ps1"
+  },
+  {
+   "md5": "57a06303dfa9cf9351222dfcbb4a29d9",
+   "desc": "SCPH-5000, DTL-H1200, H3000 (v2.2 12-04-95 J)",
+   "ver": "2.2",
+   "region": "JPN",
+   "prio": 5,
+   "kind": "ps1"
+  },
+  {
+   "md5": "8dd7d5296a650fac7319bce665a6a53c",
+   "desc": "SCPH-5500 (v3.0 09-09-96 J)",
+   "ver": "3.0",
+   "region": "JPN",
+   "prio": 5,
+   "kind": "ps1"
+  },
+  {
+   "md5": "490f666e1afb15b7362b406ed1cea246",
+   "desc": "SCPH-5501, 5503, 7003 (v3.0 11-18-96 A)",
+   "ver": "3.0",
+   "region": "USA",
+   "prio": 5,
+   "kind": "ps1"
+  },
+  {
+   "md5": "32736f17079d0b2b7024407c39bd3050",
+   "desc": "SCPH-5502, 5552 (v3.0 01-06-97 E)",
+   "ver": "3.0",
+   "region": "EUR",
+   "prio": 5,
+   "kind": "ps1"
+  },
+  {
+   "md5": "8e4c14f567745eff2f0408c8129f72a6",
+   "desc": "SCPH-7000, 7500, 9000 (v4.0 08-18-97 J)",
+   "ver": "4.0",
+   "region": "JPN",
+   "prio": 10,
+   "kind": "ps1"
+  },
+  {
+   "md5": "b84be139db3ee6cbd075630aa20a6553",
+   "desc": "SCPH-7000W (v4.1 11-14-97 A)",
+   "ver": "4.1",
+   "region": "JPN",
+   "prio": 10,
+   "kind": "ps1"
+  },
+  {
+   "md5": "1e68c231d0896b7eadcad1d7d8e76129",
+   "desc": "SCPH-7001, 7501, 7503, 9001, 9003, 9903 (v4.1 12-16-97 A)",
+   "ver": "4.1",
+   "region": "USA",
+   "prio": 10,
+   "kind": "ps1"
+  },
+  {
+   "md5": "b9d9a0286c33dc6b7237bb13cd46fdee",
+   "desc": "SCPH-7002, 7502, 9002 (v4.1 12-16-97 E)",
+   "ver": "4.1",
+   "region": "EUR",
+   "prio": 10,
+   "kind": "ps1"
+  },
+  {
+   "md5": "8abc1b549a4a80954addc48ef02c4521",
+   "desc": "SCPH-100 (v4.3 03-11-00 J)",
+   "ver": "4.3",
+   "region": "JPN",
+   "prio": 10,
+   "kind": "ps1"
+  },
+  {
+   "md5": "9a09ab7e49b422c007e6d54d7c49b965",
+   "desc": "SCPH-101 (v4.4 03-24-00 A)",
+   "ver": "4.4",
+   "region": "USA",
+   "prio": 10,
+   "kind": "ps1"
+  },
+  {
+   "md5": "6e3735ff4c7dc899ee98981385f6f3d0",
+   "desc": "SCPH-101 (v4.5 05-25-00 A)",
+   "ver": "4.5",
+   "region": "USA",
+   "prio": 10,
+   "kind": "ps1"
+  },
+  {
+   "md5": "b10f5e0e3d9eb60e5159690680b1e774",
+   "desc": "SCPH-102 (v4.4 03-24-00 E)",
+   "ver": "4.4",
+   "region": "EUR",
+   "prio": 20,
+   "kind": "ps1"
+  },
+  {
+   "md5": "de93caec13d1a141a40a79f5c86168d6",
+   "desc": "SCPH-102 (v4.5 05-25-00 E)",
+   "ver": "4.5",
+   "region": "EUR",
+   "prio": 20,
+   "kind": "ps1"
+  },
+  {
+   "md5": "476d68a94ccec3b9c8303bbd1daf2810",
+   "desc": "SCPH-1000R (v4.5 05-25-00 J)",
+   "ver": "4.5",
+   "region": "JPN",
+   "prio": 10,
+   "kind": "ps1"
+  },
+  {
+   "md5": "d8f485717a5237285e4d7c5f881b7f32",
+   "desc": "PS2, SCPH-18000 (v5.0 10-27-00 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "71f50ef4f4e17c163c78908e16244f7d",
+   "desc": "PS2, SCPH-30003 (v5.0 09-02-00 E)",
+   "ver": "5.0",
+   "region": "EUR",
+   "prio": 150,
+   "kind": "ps2"
+  },
+  {
+   "md5": "32f2e4d5ff5ee11072a6bc45530f5765",
+   "desc": "PS2, DTL-H10000 (v5.0 01/17/00 T)",
+   "ver": "5.0",
+   "region": "any",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "acf4730ceb38ac9d8c7d8e21f2614600",
+   "desc": "PS2, SCPH-10000 (v5.0 01/17/00 T)",
+   "ver": "5.0",
+   "region": "any",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "acf9968c8f596d2b15f42272082513d1",
+   "desc": "PS2, DTL-H10000 (v5.0 02/17/00 T)",
+   "ver": "5.0",
+   "region": "any",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "b1459d7446c69e3e97e6ace3ae23dd1c",
+   "desc": "PS2, SCPH-10000/SCPH-15000 (v5.0 02/17/00 T)",
+   "ver": "5.0",
+   "region": "any",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "d3f1853a16c2ec18f3cd1ae655213308",
+   "desc": "PS2, DTL-H10000 (v5.0 02/24/00 T)",
+   "ver": "5.0",
+   "region": "any",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "63e6fd9b3c72e0d7b920e80cf76645cd",
+   "desc": "PS2, DTL-H30001 (v5.0 07/27/00 A)",
+   "ver": "5.0",
+   "region": "USA",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "a20c97c02210f16678ca3010127caf36",
+   "desc": "PS2, SCPH-30001 (v5.0 07/27/00 A)",
+   "ver": "5.0",
+   "region": "USA",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "8db2fbbac7413bf3e7154c1e0715e565",
+   "desc": "PS2, SCPH-30001 (v5.0 09/02/00 A)",
+   "ver": "5.0",
+   "region": "USA",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "91c87cb2f2eb6ce529a2360f80ce2457",
+   "desc": "PS2, DTL-H30002 (v5.0 09/02/00 E)",
+   "ver": "5.0",
+   "region": "EUR",
+   "prio": 150,
+   "kind": "ps2"
+  },
+  {
+   "md5": "3016b3dd42148a67e2c048595ca4d7ce",
+   "desc": "PS2, DTL-H30102 (v5.0 09/02/00 E)",
+   "ver": "5.0",
+   "region": "EUR",
+   "prio": 150,
+   "kind": "ps2"
+  },
+  {
+   "md5": "b7fa11e87d51752a98b38e3e691cbf17",
+   "desc": "PS2, SCPH-30002/SCPH-30003/SCPH-30004 (v5.0 09/02/00 E)",
+   "ver": "5.0",
+   "region": "EUR",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "f63bc530bd7ad7c026fcd6f7bd0d9525",
+   "desc": "PS2, SCPH-18000 (GH-003) (v5.0 10/27/00 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "cee06bd68c333fc5768244eae77e4495",
+   "desc": "PS2, SCPH-18000 (GH-008) (v5.0 10/27/00 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "0bf988e9c7aaa4c051805b0fa6eb3387",
+   "desc": "PS2, DTL-H30101 (v5.0 12/28/00 A)",
+   "ver": "5.0",
+   "region": "USA",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "8accc3c49ac45f5ae2c5db0adc854633",
+   "desc": "PS2, SCPH-30001/SCPH-35001 (v5.0 12/28/00 A)",
+   "ver": "5.0",
+   "region": "USA",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "6f9a6feb749f0533aaae2cc45090b0ed",
+   "desc": "PS2, DTL-H30102 (v5.0 12/28/00 E)",
+   "ver": "5.0",
+   "region": "EUR",
+   "prio": 150,
+   "kind": "ps2"
+  },
+  {
+   "md5": "838544f12de9b0abc90811279ee223c8",
+   "desc": "PS2, SCPH-30002/SCPH-30003/SCPH-30004/SCHP-35002/SCPH-35003/SCPH-35004 (v5.0 12/28/00 E)",
+   "ver": "5.0",
+   "region": "EUR",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "bb6bbc850458fff08af30e969ffd0175",
+   "desc": "PS2, DTL-H30000 (v5.0 01/18/01 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "815ac991d8bc3b364696bead3457de7d",
+   "desc": "PS2, SCPH-30000/SCPH-35000 (v5.0 01/18/01 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "b107b5710042abe887c0f6175f6e94bb",
+   "desc": "PS2, SCPH-30001R (v5.0 04/27/01 A)",
+   "ver": "5.0",
+   "region": "USA",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "ab55cceea548303c22c72570cfd4dd71",
+   "desc": "PS2, SCPH-30000 (v5.0 04/27/01 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "18bcaadb9ff74ed3add26cdf709fff2e",
+   "desc": "PS2, SCPH-30001R (v5.0 07/04/01 A)",
+   "ver": "5.0",
+   "region": "USA",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "491209dd815ceee9de02dbbc408c06d6",
+   "desc": "PS2, SCPH-30002R/SCPH-30003R/SCPH-30004R (v5.0 07/04/01 E)",
+   "ver": "5.0",
+   "region": "EUR",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "7200a03d51cacc4c14fcdfdbc4898431",
+   "desc": "PS2, SCPH-30001R (v5.0 10/04/01 A)",
+   "ver": "5.0",
+   "region": "USA",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "8359638e857c8bc18c3c18ac17d9cc3c",
+   "desc": "PS2, SCPH-30002R/SCPH-30003R/SCPH-30004R (v5.0 10/04/01 E)",
+   "ver": "5.0",
+   "region": "EUR",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "352d2ff9b3f68be7e6fa7e6dd8389346",
+   "desc": "PS2, SCPH-30005R/SCPH-30006R/SCPH-30007R (v5.0 07/30/01 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "d5ce2c7d119f563ce04bc04dbc3a323e",
+   "desc": "PS2, SCPH-39001 (v5.0 02/07/02 A)",
+   "ver": "5.0",
+   "region": "USA",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "0d2228e6fd4fb639c9c39d077a9ec10c",
+   "desc": "PS2, SCPH-39002/SCPH-39003/SCPH-39004 (v5.0 03/19/02 E)",
+   "ver": "5.0",
+   "region": "EUR",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "72da56fccb8fcd77bba16d1b6f479914",
+   "desc": "PS2, SCPH-37000/SCPH-39000 (v5.0 04/26/02 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "5b1f47fbeb277c6be2fccdd6344ff2fd",
+   "desc": "PS2, SCPH-39008 (v5.0 04/26/02 E)",
+   "ver": "5.0",
+   "region": "EUR",
+   "prio": 150,
+   "kind": "ps2"
+  },
+  {
+   "md5": "315a4003535dfda689752cb25f24785c",
+   "desc": "PS2, SCPH-39005/SCPH-39006/SCPH-39007 (v5.0 04/26/02 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "54ecde087258557e2ddb5c3ddb004028",
+   "desc": "PS2, DTL-H50000 (v5.0 02/06/03 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "312ad4816c232a9606e56f946bc0678a",
+   "desc": "PS2, SCPH-50000/SCPH-55000 (v5.0 02/06/03 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "666018ffec65c5c7e04796081295c6c7",
+   "desc": "PS2, DTL-H50002 (v5.0 02/27/03 E)",
+   "ver": "5.0",
+   "region": "EUR",
+   "prio": 150,
+   "kind": "ps2"
+  },
+  {
+   "md5": "6e69920fa6eef8522a1d688a11e41bc6",
+   "desc": "PS2, SCPH-50002/SCPH-50003/SCPH-50004 (v5.0 02/27/03 E)",
+   "ver": "5.0",
+   "region": "EUR",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "eb960de68f0c0f7f9fa083e9f79d0360",
+   "desc": "PS2, DTL-H50001 (v5.0 03/25/03 A)",
+   "ver": "5.0",
+   "region": "USA",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "8aa12ce243210128c5074552d3b86251",
+   "desc": "PS2, SCPH-50001 (v5.0 03/25/03 A)",
+   "ver": "5.0",
+   "region": "USA",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "240d4c5ddd4b54069bdc4a3cd2faf99d",
+   "desc": "PS2, DTL-H50009 (v5.0 02/24/03 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "1c6cd089e6c83da618fbf2a081eb4888",
+   "desc": "PS2, DESR-5000/DESR-5100/DESR-7000/DESR-7100 (v5.0 10/28/03 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "463d87789c555a4a7604e97d7db545d1",
+   "desc": "PS2, SCPH-55000 (v5.0 06/23/03 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "ab9d49ad40ae49f19856ad187777b1b3",
+   "desc": "PS2, DTL-H50001 (v5.0 06/23/03 A)",
+   "ver": "5.0",
+   "region": "USA",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "35461cecaa51712b300b2d6798825048",
+   "desc": "PS2, SCPH-50001/SCPH-50010 (v5.0 06/23/03 A)",
+   "ver": "5.0",
+   "region": "USA",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "bd6415094e1ce9e05daabe85de807666",
+   "desc": "PS2, SCPH-50002/SCPH-50003/SCPH-50004 (v5.0 06/23/03 E)",
+   "ver": "5.0",
+   "region": "EUR",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "2e70ad008d4ec8549aada8002fdf42fb",
+   "desc": "PS2, SCPH-50006/SCPH-50007 (v5.0 06/23/03 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "50d5b97b57d8c9b6534adcb46c2027d4",
+   "desc": "PS2, SCPH-50005 (v5.0 06/23/03 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "b53d51edc7fc086685e31b811dc32aad",
+   "desc": "PS2, SCPH-50008 (v5.0 06/23/03 E)",
+   "ver": "5.0",
+   "region": "EUR",
+   "prio": 150,
+   "kind": "ps2"
+  },
+  {
+   "md5": "1b6e631b536247756287b916f9396872",
+   "desc": "PS2, SCPH-50009 (v5.0 06/23/03 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "00da1b177096cfd2532c8fa22b43e667",
+   "desc": "PS2, SCPH-50000 (v5.0 08/22/03 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "afde410bd026c16be605a1ae4bd651fd",
+   "desc": "PS2, SCPH-50004 (v5.0 08/22/03 E)",
+   "ver": "5.0",
+   "region": "EUR",
+   "prio": 150,
+   "kind": "ps2"
+  },
+  {
+   "md5": "81f4336c1de607dd0865011c0447052e",
+   "desc": "PS2, SCPH-50011 (v5.0 03/29/04 A)",
+   "ver": "5.0",
+   "region": "USA",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "0eee5d1c779aa50e94edd168b4ebf42e",
+   "desc": "PS2, SCPH-70000 (v5.0 06/14/04 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "d333558cc14561c1fdc334c75d5f37b7",
+   "desc": "PS2, SCPH-70001/SCPH-70011/SCPH-70012 (v5.0 06/14/04 A)",
+   "ver": "5.0",
+   "region": "USA",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "dc752f160044f2ed5fc1f4964db2a095",
+   "desc": "PS2, SCPH-70002/SCPH-70003/SCPH-70004/SCPH-70008 (v5.0 06/14/04 E)",
+   "ver": "5.0",
+   "region": "EUR",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "7ebb4fc5eab6f79a27d76ac9aad392b2",
+   "desc": "PS2, SCPH-70002 (v5.0 06/14/04 E)",
+   "ver": "5.0",
+   "region": "EUR",
+   "prio": 150,
+   "kind": "ps2"
+  },
+  {
+   "md5": "63ead1d74893bf7f36880af81f68a82d",
+   "desc": "PS2, DTL-H70002 (v5.0 06/14/04 E)",
+   "ver": "5.0",
+   "region": "EUR",
+   "prio": 150,
+   "kind": "ps2"
+  },
+  {
+   "md5": "3e3e030c0f600442fa05b94f87a1e238",
+   "desc": "PS2, SCPH-70005/SCPH-70006/SCPH-70007 (v5.0 06/14/04 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "1ad977bb539fc9448a08ab276a836bbc",
+   "desc": "PS2, DESR-5500/DESR-5700/DESR-7500/DESR-7700 (v5.0 09/17/04 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "bf0078ba5e19d57eae18047407f3b6e5",
+   "desc": "PS2, DTL-H75000 (v5.0 06/20/05 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "eb4f40fcf4911ede39c1bbfe91e7a89a",
+   "desc": "PS2, SCPH-75000 (v5.0 06/20/05 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "9959ad7a8685cad66206e7752ca23f8b",
+   "desc": "PS2, DTL-H75000A (v5.0 06/20/05 A)",
+   "ver": "5.0",
+   "region": "USA",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "929a14baca1776b00869f983aa6e14d2",
+   "desc": "PS2, SCPH-75001/SCPH-75010 (v5.0 06/20/05 A)",
+   "ver": "5.0",
+   "region": "USA",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "573f7d4a430c32b3cc0fd0c41e104bbd",
+   "desc": "PS2, SCPH-75002/SCPH-75003/SCPH-75004/SCPH-75008 (v5.0 06/20/05 E)",
+   "ver": "5.0",
+   "region": "EUR",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "df63a604e8bff5b0599bd1a6c2721bd0",
+   "desc": "PS2, SCPH-75006 (v5.0 06/20/05 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "5b1ba4bb914406fae75ab8e38901684d",
+   "desc": "PS2, SCPH-77000 (v5.0 02/10/06 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "cb801b7920a7d536ba07b6534d2433ca",
+   "desc": "PS2, SCPH-77001/SCPH-77010 (v5.0 02/10/06 A)",
+   "ver": "5.0",
+   "region": "USA",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "af60e6d1a939019d55e5b330d24b1c25",
+   "desc": "PS2, SCPH-77002/SCPH-77003/SCPH-77004/SCPH-77008 (v5.0 02/10/06 E)",
+   "ver": "5.0",
+   "region": "EUR",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "549a66d0c698635ca9fa3ab012da7129",
+   "desc": "PS2, SCPH-77006/SCPH-77007 (v5.0 02/10/06 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "5e2014472c88f74f7547d8c2c60eca45",
+   "desc": "PS2, DTL-H90000 (v5.0 09/05/06 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "5de9d0d730ff1e7ad122806335332524",
+   "desc": "PS2, SCPH-79000/SCPH-90000 (v5.0 09/05/06 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "21fe4cad111f7dc0f9af29477057f88d",
+   "desc": "PS2, DTL-H90000 (v5.0 09/05/06 A)",
+   "ver": "5.0",
+   "region": "USA",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "40c11c063b3b9409aa5e4058e984e30c",
+   "desc": "PS2, SCPH-79001/SCPH-79010/SCPH-90001 (v5.0 09/05/06 A)",
+   "ver": "5.0",
+   "region": "USA",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "80bbb237a6af9c611df43b16b930b683",
+   "desc": "PS2, SCPH-79002/SCPH-79003/SCPH-79004/SCPH-79008/SCPH-90002/SCPH-90003/SCPH-90004 (v5.0 09/05/06 E)",
+   "ver": "5.0",
+   "region": "EUR",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "c37bce95d32b2be480f87dd32704e664",
+   "desc": "PS2, SCPH-79006/SCPH-79007/SCPH-90006/SCPH-90007 (v5.0 09/05/06 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "80ac46fa7e77b8ab4366e86948e54f83",
+   "desc": "PS2, SCPH-90000 (v5.0 02/20/08 J)",
+   "ver": "5.0",
+   "region": "JPN",
+   "prio": 100,
+   "kind": "ps2"
+  },
+  {
+   "md5": "93ea3bcee4252627919175ff1b16a1d9",
+   "desc": "PS2, KDL-22PX300 (v5.0 04/15/10 E)",
+   "ver": "5.0",
+   "region": "EUR",
+   "prio": 150,
+   "kind": "ps2"
+  }
+ ],
+ "retroarch": {
+  "disksys.rom": [
+   {
+    "size": 8192,
+    "md5": "ca30b50f880eb660a320674ed365ef7a"
+   }
+  ],
+  "gb_bios.bin": [
+   {
+    "size": 256,
+    "md5": "32fbbd84168d3482956eb3c5051637f5"
+   }
+  ],
+  "gba_bios.bin": [
+   {
+    "size": 16384,
+    "md5": "a860e8c0b6d573d191e4ec7db1b1e4f6"
+   }
+  ],
+  "gbc_bios.bin": [
+   {
+    "size": 2304,
+    "md5": "dbfce9db9deaa2567f6a84fde55f9680"
+   }
+  ],
+  "sgb_bios.bin": [
+   {
+    "size": 256,
+    "md5": "d574d4f9c12f305074798f54c091a8b4"
+   }
+  ],
+  "bios.gg": [
+   {
+    "size": 1024,
+    "md5": "672e104c3be3a238301aceffc3b23fd6"
+   }
+  ],
+  "bios_E.sms": [
+   {
+    "size": 8192,
+    "md5": "840481177270d5642a14ca71ee72844c"
+   }
+  ],
+  "bios_J.sms": [
+   {
+    "size": 8192,
+    "md5": "24a519c53f67b00640d0048ef7089105"
+   }
+  ],
+  "bios_U.sms": [
+   {
+    "size": 8192,
+    "md5": "840481177270d5642a14ca71ee72844c"
+   }
+  ],
+  "bios_CD_E.bin": [
+   {
+    "size": 131072,
+    "md5": "e66fa1dc5820d254611fdcdba0662372"
+   }
+  ],
+  "bios_CD_J.bin": [
+   {
+    "size": 131072,
+    "md5": "278a9397d192149e84e820ac621a8edd"
+   }
+  ],
+  "bios_CD_U.bin": [
+   {
+    "size": 131072,
+    "md5": "2efd74e3232ff260e371b99f84024f7f"
+   }
+  ],
+  "bios_MD.bin": [
+   {
+    "size": 2048,
+    "md5": "d3293ebaaa7f4eb2a6766b68a0fb4609"
+   }
+  ]
+ }
+}

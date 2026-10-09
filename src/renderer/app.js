@@ -45,6 +45,50 @@ function shelfCard(g) {
       <div class="over"><b>${esc(nm(g))}</b><div class="acts"><button class="p" data-play="${esc(g.id)}">▶ Play</button><button class="cog" data-cog="${esc(g.id)}" title="settings">⚙</button></div></div></div>`;
 }
 
+/* ---------- bios: what each emulator needs, what you have, drop to install ---------- */
+let BIOS = [];
+const biosBlocked = () => BIOS.filter(b => b.required && !b.ok);
+async function loadBios() { BIOS = await repro.biosStatus().catch(() => []); }
+function renderBios() {
+  VL = null;
+  const blocked = biosBlocked();
+  $('#count').textContent = blocked.length ? `${blocked.reduce((n, b) => n + b.games, 0)} games blocked` : 'all set';
+  const row = (b, f) => {
+    const st = f.ok ? (f.optional ? 'have' : f.known ? 'good' : 'ok') : f.optional ? (f.bad ? 'wrong' : 'opt') : 'bad';
+    const tag = { good: '✓ verified', ok: '✓ usable', have: '✓ have it', opt: 'optional', bad: '✕ unusable', wrong: '✕ wrong file' }[st];
+    return `<div class="slot bf ${st}"><div class="sh glyph">${f.ok ? '✓' : f.optional && !f.bad ? '○' : '✕'}</div><div class="t"><b>${esc(f.file)}</b>${f.region && f.region !== '?' ? ` <span class="rg">${esc(f.region)}</span>` : ''}${f.sys ? ` <span class="rg">${esc(sysName(f.sys))}</span>` : ''}<small>${esc(f.label)}</small></div><span class="btag">${tag}</span></div>`;
+  };
+  const card = b => `<div class="pane bcard ${b.required ? (b.ok ? 'ok' : 'need') : 'opt'}">
+      <div class="bh">${logo(b.emu)}<div class="bt"><b>${esc(b.name)}</b><small>${b.required ? (b.ok ? 'ready' : `<span class="bneed">${esc(b.note)}</span>`) : 'optional extras, games run without them'}</small>${b.ok && b.note ? `<small class="bwarn">${esc(b.note)}</small>` : ''}</div>
+      <button data-bopen="${esc(b.emu)}">open folder</button></div>
+      <div class="bdir">${esc(b.dir || '')}</div>
+      ${b.files.length ? b.files.map(f => row(b, f)).join('') : `<div class="hint" style="padding:6px 2px">folder is empty</div>`}
+    </div>`;
+  $('#main').innerHTML = `<h2>BIOS</h2><div class="sub">some consoles won't boot without the firmware from a real console. REPRO checks the files against the emulators' own lists and copies them where they go. it never downloads any.</div>
+    <div id="items" class="bios">
+      <div class="bdrop" id="bDrop"><b>drop BIOS files anywhere in this window</b><span>or <a id="bPick">pick files…</a> · REPRO figures out which emulator each one is for</span></div>
+      ${BIOS.filter(b => b.required).map(card).join('')}${BIOS.filter(b => !b.required).map(card).join('')}
+      ${BIOS.length ? '' : '<div class="hint">no emulators that use BIOS files are set up yet.</div>'}
+      <div class="hint" style="margin-top:14px">dump it from a console you own: PS1 via a modded PS2 or a PS1 + Caetla/xstation, PS2 with the PCSX2 BIOS dumper. legally REPRO can't ship these.</div>
+    </div>`;
+  $('#main').querySelectorAll('[data-bopen]').forEach(b => b.onclick = () => repro.biosOpen(b.dataset.bopen));
+  $('#bPick').onclick = async () => installBios(await repro.biosPick());
+}
+async function installBios(paths) {
+  if (!paths?.length) return false;
+  const res = await repro.biosInstall(paths);
+  const done = res.flatMap(r => r.done), unknown = res.filter(r => !r.recognized);
+  await loadBios();
+  if (done.length) {
+    const fresh = done.filter(d => !d.already && !d.conflict);
+    toast(fresh.length ? `installed <b>${esc(fresh.map(d => d.label).filter((x, i, a) => a.indexOf(x) === i).join(', '))}</b> → ${esc([...new Set(fresh.map(d => d.emu))].join(', '))}`
+      : done.some(d => d.conflict) ? `a different <b>${esc(done[0].file)}</b> is already there, left it alone` : 'already installed');
+  }
+  if (unknown.length && !done.length) toast(`<b>${esc(unknown[0].src.split(/[\\/]/).pop())}</b> isn't a BIOS any of your emulators use`);
+  renderSide(); if (filter === 'bios') renderBios();
+  return done.length > 0 || filter === 'bios';
+}
+
 /* ---------- saved views: {id,name,filter:{sys,fav,q}} ---------- */
 function matchView(g, v) { if (v.sys && g.sys !== v.sys) return false; if (v.fav && !g.fav) return false; if (v.q && !(nm(g) + ' ' + g.title).toLowerCase().includes(v.q.toLowerCase())) return false; return true; }
 
@@ -71,7 +115,8 @@ function renderSide() {
     ${emuIds.map(id => `<button class="it ${filter == 'e:' + id ? 'on' : ''}" data-f="e:${id}" ${sysc(S.emulators[id].systems?.[0])}>${logo(id)}<span class="tx">${esc(S.emulators[id].name)}</span></button>`).join('')}
     <button class="it add" id="addEmuBtn">${logo('pc')}<span class="tx">add emulator…</span></button>
   </details>`;
-  if (S.unsorted.length) h += `<details open><summary>Needs you</summary>${it('unsorted', null, 'Unsorted', S.unsorted.length, '<span class="warn"></span>')}</details>`;
+  const bb = biosBlocked(), needBios = bb.reduce((n, b) => n + b.games, 0);
+  if (S.unsorted.length || bb.length) h += `<details open><summary>Needs you</summary>${bb.length ? it('bios', null, 'BIOS missing', needBios || '', '<span class="warn" title="games that can\'t start yet"></span>') : ''}${S.unsorted.length ? it('unsorted', null, 'Unsorted', S.unsorted.length, '<span class="warn"></span>') : ''}</details>`;
   $('#side').innerHTML = h;
   $('#side').querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filter = b.dataset.f; renderSide(); renderMain(); });
   $('#addEmuBtn').onclick = addExe;
@@ -158,6 +203,7 @@ function vlLayout(keepScroll) {
 function renderMain() {
   if (!S.all) applyJunk();
   if (filter == 'unsorted') { VL = null; return renderUnsorted(); }
+  if (filter == 'bios') return renderBios();
   if (filter.startsWith('e:')) { VL = null; return renderEmu(filter.slice(2)); }
   const l = list();
   $('#count').textContent = `${l.length} / ${S.games.length}`;
@@ -331,7 +377,7 @@ async function loadSavesTab(g) {
     if (r.error) toast(`<b>error:</b> ${esc(r.error)}`); else { toast('deleted'); loadSavesTab(g); }
   });
 }
-async function launch(id) { const g = byId(id); const r = await repro.launch(id); if (r.error) return toast(`<b>can't launch:</b> ${esc(r.error)}`); toast(`launching <b>${esc(nm(g))}</b>`); }
+async function launch(id) { const g = byId(id); const r = await repro.launch(id); if (r.bios) { await loadBios(); filter = 'bios'; if (app.classList.contains('couch')) setMode('desktop'); renderSide(); renderMain(); return toast(`<b>${esc(nm(g))}</b> needs a BIOS first: drop yours here`); } if (r.error) return toast(`<b>can't launch:</b> ${esc(r.error)}`); toast(`launching <b>${esc(nm(g))}</b>`); }
 async function scrapeOne(id) {
   const g = byId(id); toast(`scraping art for <b>${esc(nm(g))}</b>…`);
   const r = await repro.scrapeOne(id);
@@ -536,7 +582,7 @@ repro.onMenu((cmd, arg) => {
   ({ addRomDir: () => $('#railAdd').click(), addExe, rescan: () => refresh(true), setup: openSettings, duplicates: openDuplicates,
      autoScan: () => { openSettings(); setTimeout(() => $('#mAutoScan')?.click(), 400); },
      search: () => { $('#q').focus(); }, mode: () => setMode(arg), theme: () => setTheme(arg), ui: () => setUI(arg),
-     toast: () => toast(arg), hubkey: changeHubKey })[cmd]?.();
+     toast: () => toast(arg), hubkey: changeHubKey, bios: async () => { await loadBios(); filter = 'bios'; renderSide(); renderMain(); } })[cmd]?.();
 });
 async function changeHubKey(onClose) {
   const gen = ++modalGen;
@@ -586,6 +632,8 @@ document.addEventListener('keydown', e => {
 document.addEventListener('drop', async e => {
   e.preventDefault(); const f = e.dataTransfer.files[0]; if (!f) return;
   const p = repro.pathOf(f); if (!p) return toast('could not read the dropped path');
+  // bios dumps first: identified by size + hash, so a dropped rom or exe just falls through
+  if (await installBios([...e.dataTransfer.files].map(x => repro.pathOf(x)).filter(Boolean))) return;
   // emulator binary? (.exe on windows; on linux any file a recipe recognises, e.g. dolphin-emu or DuckStation-x64.AppImage)
   const r = await repro.detectOne(p);
   if (r) { S = await repro.setEmulator({ id: r.recipe, exe: p }); toast(`added <b>${esc(r.name)}</b>`); renderAll(); }
@@ -789,7 +837,7 @@ function renderAll() { applyJunk(); renderSide(); renderMain(); renderDetail(); 
 async function refresh(showToast) {
   const rec = await repro.recoverPaths().catch(()=>({recovered:0}));
   if (rec.recovered) toast(`recovered ${rec.recovered} moved game${rec.recovered!==1?'s':''}`);
-  S = await repro.scan();
+  S = await repro.scan(); await loadBios();
   if (showToast) toast(`rescanned: ${S.games.length} games`);
   renderAll();
 }
@@ -797,7 +845,7 @@ async function refresh(showToast) {
   ROOT = await repro.root();
   BUNDLE = await repro.bundle();
   $('#brandLg').style.setProperty('--m', `url('${fileUrl(BUNDLE + '/assets/brand/repro-mark.svg')}')`);
-  S = await repro.snapshot();
+  S = await repro.snapshot(); await loadBios();
   const c = S.config || {};
   setTheme(c.theme || 'billet'); setUI(c.ui || 'desk');
   if (c.panels) { setPanel('side', c.panels.side !== false); setPanel('detail', c.panels.detail !== false); }

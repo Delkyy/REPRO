@@ -40,6 +40,7 @@ const writeJson = (p, v) => fs.writeFileSync(p, JSON.stringify(v, null, 2));
 let config = readJson(P.config, { emulators: {}, romDirs: [], mode: 'desktop', ui: 'desk', theme: 'billet', views: [], panels: { side: true, detail: true }, cardSize: 150, hubKey: 'Ctrl+Alt+H', igdb: {} });
 let library = readJson(P.library, { games: {} }); // keyed by rom path
 const titles = require('./titles');
+const bios = require('./bios');
 const saveConfig = () => writeJson(P.config, config);
 const saveLibrary = () => writeJson(P.library, library);
 
@@ -439,6 +440,10 @@ function launch(gameId) {
   const emu = g.emulator ? { id: g.emulator, ...config.emulators[g.emulator], recipe: recipes[g.emulator] } : emulatorFor(g.sys);
   if (!emu || !emu.exe) return { error: `no emulator set up for ${SYSTEMS[g.sys]}` };
   // snapshot whatever saves exist right now, so this session can always be rolled back (skipped if unchanged)
+  if (bios.REQUIRED[emu.id]?.includes(g.sys)) {
+    const st = bios.status(emu.id, { dataDir: emu.dataDir, home: os.homedir() });
+    if (!st.ok) return { error: `${emu.recipe.name} needs a ${SYSTEMS[g.sys]} BIOS first`, bios: true };
+  }
   const before = safeSnapshot(g, { reason: 'before-play' });
   const argsTpl = g.args || emu.recipe.args[g.sys] || emu.recipe.args['*'] || ['{rom}'];
   const core = emu.recipe.cores?.[g.sys];
@@ -538,6 +543,7 @@ function buildMenu() {
         ...emuFolders(id, e).map(f => ({ label: 'Open ' + f.label, click: () => shell.openPath(f.path) })),
       ] })) : [{ label: 'none set up yet', enabled: false }] },
     { label: 'Help', submenu: [
+      { label: 'BIOS check…', click: () => send('menu', 'bios') },
       { label: 'Roadmap', click: () => shell.openPath(path.join(ROOT, 'ROADMAP.md')) },
       { label: 'Recipes folder', click: () => shell.openPath(P.recipes) },
       { label: 'Themes folder', click: () => shell.openPath(P.themes) },
@@ -581,6 +587,23 @@ app.on('will-quit', () => { globalShortcut.unregisterAll(); stopGuideHook(); });
 module.exports = { coverRunning: () => !!coverJob, startCovers, IMG, library, saveCtx, launch, killRunning, detectEmulators, scanLibrary, snapshot, config, saveConfig, recipes, resolveDataDir, recipeForExe, isEmulatorFile, ROOT };
 
 // ---------- ipc
+// bios: status per configured emulator (only the ones bios.js understands), counting games so the page can say
+// "31 games can't start" instead of a generic warning.
+function biosStatus() {
+  const systems = {}; for (const g of Object.values(library.games)) systems[g.sys] = (systems[g.sys] || 0) + 1;
+  const out = [];
+  for (const id of bios.SUPPORTED) {
+    const e = config.emulators[id]; if (!e?.exe) continue;
+    const s = bios.status(id, { dataDir: e.dataDir, home: os.homedir(), systems });
+    if (s.required || s.files.length) out.push({ ...s, name: recipes[id]?.name || id });
+  }
+  return out;
+}
+function biosTargets() { const t = {}; for (const id of bios.SUPPORTED) { const e = config.emulators[id]; if (e?.exe) { const d = bios.biosDir(id, e.dataDir, os.homedir()); if (d) t[id] = d; } } return t; }
+ipcMain.handle('biosStatus', () => biosStatus());
+ipcMain.handle('biosInstall', (_, files) => (files || []).map(f => ({ src: f, ...bios.install(f, biosTargets()) })));
+ipcMain.handle('biosOpen', (_, emu) => { const d = biosTargets()[emu]; if (!d) return; fs.mkdirSync(d, { recursive: true }); shell.openPath(d); });
+ipcMain.handle('biosPick', async () => { const r = await dialog.showOpenDialog(win, { title: 'pick your BIOS dump(s)', properties: ['openFile', 'multiSelections'] }); return r.canceled ? [] : r.filePaths; });
 ipcMain.handle('snapshot', () => snapshot());
 ipcMain.handle('covers', (_, o) => startCovers(o || {}));
 ipcMain.handle('coversStop', () => { coverJob?.stop(); return { ok: true }; });
