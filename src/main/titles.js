@@ -47,8 +47,29 @@ function fixArticles(s) {
   return s.split(' - ').map(seg => { const m = seg.match(ARTICLES); return m && !m[3]?.trim() ? `${m[2]} ${m[1]}` : m ? `${m[2]} ${m[1]}${m[3]}` : seg; }).join(' - ');
 }
 
+// fan-translation packs name files by bracket groups instead of No-Intro:
+//   [恶魔城 晓月圆舞曲][キャッスルヴァニア 暁月の円舞曲][Castlevania Aria of Sorrow][20030508][GBA][汉化][GBA].zip
+// -> name from the latin group, the platform tag says which console it really is (they get dumped in random folders).
+const PACK_SYS = { FC: 'nes', NES: 'nes', SFC: 'snes', SNES: 'snes', GB: 'gb', GBC: 'gbc', GBA: 'gba', NDS: 'ds', N64: 'n64', PS: 'ps1', PSX: 'ps1', PS1: 'ps1', PS2: 'ps2', MD: 'genesis', GEN: 'genesis', PSP: 'psp' };
+function parsePack(st) {
+  const g = [...st.matchAll(/\[([^\]]*)\]/g)].map(m => m[1].trim());
+  if (g.length < 4 || st.replace(/\[[^\]]*\]/g, '').trim()) return null;   // the whole name is bracket groups
+  const latin = g.find(x => /[a-z]{3}/i.test(x) && !/[^\x00-\x7f\u2160-\u217f]/.test(x) && !PACK_SYS[x.toUpperCase()]);
+  if (!latin) return null;
+  const plat = g.map(x => x.toUpperCase()).filter(x => PACK_SYS[x]);
+  const pc = g.some(x => /^(exe|pc|安装版)$/i.test(x) || /安装/.test(x));
+  const name = latin.replace(/[\u2160-\u216b]/g, c => ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'][c.charCodeAt(0) - 0x2160])
+    .replace(/([a-z])([A-Z][a-z])/g, '$1 $2').replace(/\s+/g, ' ').trim();       // "CastlevaniaPortrait" -> "Castlevania Portrait"
+  return { name, sys: pc ? null : PACK_SYS[plat[plat.length - 1]] || null, pc };
+}
+
 function parse(file) {
   let s = stem(file);
+  const pack = parsePack(s);
+  if (pack) {
+    const name = pack.name, sort = name.replace(/^(the|a|an) /i, '').toLowerCase();
+    return { name, sort, group: name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(), kind: pack.pc ? 'pc' : null, junk: false, chips: ['CN translation'], trans: 'CN translation', sysHint: pack.sys, pc: pack.pc };
+  }
   const tags = []; let kind = null, disc = null, trans = null;
   // leading [BIOS] / [Hack] style prefixes
   s = s.replace(/^\s*\[([^\]]+)\]\s*/, (_, t) => { tags.push(t.trim()); return ''; });

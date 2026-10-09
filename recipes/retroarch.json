@@ -1,7 +1,7 @@
 {
   "id": "retroarch",
   "name": "RetroArch",
-  "systems": ["nes", "snes", "genesis", "sms", "gg", "gb", "gba", "n64"],
+  "systems": ["nes", "snes", "genesis", "sms", "gg", "gb", "gbc", "gba", "n64"],
   "exe": {
     "win": ["retroarch.exe"],
     "linux": ["retroarch", "RetroArch*.AppImage"]
@@ -14,6 +14,7 @@
     "sms": "genesis_plus_gx",
     "gg": "genesis_plus_gx",
     "gb": "mgba",
+    "gbc": "mgba",
     "gba": "mgba",
     "n64": "mupen64plus_next"
   },
@@ -24,7 +25,8 @@
     "genesis": [".md", ".gen", ".smd", ".7z", ".zip"],
     "sms": [".sms", ".7z", ".zip"],
     "gg": [".gg", ".7z", ".zip"],
-    "gb": [".gb", ".gbc", ".7z", ".zip"],
+    "gb": [".gb", ".7z", ".zip"],
+    "gbc": [".gbc", ".7z", ".zip"],
     "gba": [".gba", ".7z", ".zip"],
     "n64": [".z64", ".n64", ".v64", ".7z", ".zip"]
   },

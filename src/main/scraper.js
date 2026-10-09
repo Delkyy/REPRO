@@ -10,7 +10,7 @@ const os = require('os');
 
 const IGDB_PLATFORM_IDS = {
   nes: 18, snes: 19, n64: 4, gc: 21, wii: 5, wiiu: 41, switch: 130,
-  gb: 33, gba: 24, ds: 20, '3ds': 37,
+  gb: 33, gbc: 22, gba: 24, ds: 20, '3ds': 37,
   ps1: 7, ps2: 8, ps3: 9, psp: 38, vita: 46,
   xbox: 11, x360: 12, genesis: 29, saturn: 32, dc: 23, pc: 6,
 };
@@ -21,7 +21,7 @@ const LR_SYSTEM = {
   n64: 'Nintendo - Nintendo 64',
   gc: 'Nintendo - GameCube',
   wii: 'Nintendo - Wii',
-  gb: 'Nintendo - Game Boy', gba: 'Nintendo - Game Boy Advance',
+  gb: 'Nintendo - Game Boy', gbc: 'Nintendo - Game Boy Color', gba: 'Nintendo - Game Boy Advance',
   ds: 'Nintendo - Nintendo DS', '3ds': 'Nintendo - Nintendo 3DS',
   ps1: 'Sony - PlayStation', ps2: 'Sony - PlayStation 2',
   ps3: 'Sony - PlayStation 3', psp: 'Sony - PlayStation Portable',

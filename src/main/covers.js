@@ -61,7 +61,7 @@ function matchName(game, names, idx) {
   const pick = list => list && list.slice().sort((a, b) => rank(a) - rank(b) || a.length - b.length)[0];
   const byBase = pick(idx.base.get(baseTitle(stem).toLowerCase()));
   if (byBase && !BAD.test(byBase)) return byBase;
-  const byFuzzy = pick(idx.fuzzy.get(fuzzy(stem)) || idx.fuzzy.get(fuzzy(lrName(game.title || ''))));
+  const byFuzzy = pick(idx.fuzzy.get(fuzzy(stem)) || idx.fuzzy.get(fuzzy(lrName(game.title || ''))) || (game.name ? idx.fuzzy.get(fuzzy(lrName(game.name))) : null)); // display name: translation packs
   if (byFuzzy && !BAD.test(byFuzzy)) return byFuzzy;
   return byBase || byFuzzy || null;
 }
@@ -139,12 +139,15 @@ async function coverFor(game, { artDir, cacheDir, img, fetch = get, indexes = {}
     if (!(key in indexes)) { const names = await loadIndex(game.sys, kind, cacheDir, { fetch }); indexes[key] = names && { names, idx: indexNames(names) }; }
     const ix = indexes[key]; if (!ix) continue;
     const name = matchName(game, ix.names, ix.idx); if (!name) continue;
+    const dir = path.join(artDir, game.sys);
+    const out = path.join(dir, `${lrName(stemOf(game.file || game.title))}.${kind}.jpg`);
+    // already on disk from an earlier (maybe interrupted) run: reuse it, no download. the cdn can be slow (1-5s a cover).
+    if (fs.existsSync(out)) { const d = describeLocal(out, img); if (d) return { art: out, artKind: kind, ...d, artFrom: name }; }
     const r = await fetch(folderUrl(game.sys, kind) + encodeURIComponent(name) + '.png').catch(() => null);
     if (!r || r.status !== 200 || r.body.length < 500) continue;
     const pic = img.decode(r.body); if (!pic || !pic.w) continue;
-    const dir = path.join(artDir, game.sys); fs.mkdirSync(dir, { recursive: true });
-    const out = path.join(dir, `${lrName(stemOf(game.file || game.title))}.${kind}.jpg`);
-    fs.writeFileSync(out, pic.jpeg(420));
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(out + '.part', pic.jpeg(420)); fs.renameSync(out + '.part', out); // never leave a half-written jpg to be "reused"
     const bm = pic.bitmap(64);
     return { art: out, artKind: kind, artAR: +(pic.w / pic.h).toFixed(3), ...prefix(accentFromBitmap(bm.data, bm.w, bm.h)), artFrom: name };
   }

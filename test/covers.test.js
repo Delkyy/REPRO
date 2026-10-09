@@ -67,5 +67,11 @@ test('coverFor: index cached once, box art preferred, title screen fallback, fil
   assert.strictEqual(await C.coverFor({ sys: 'snes', title: 'Nope', file: 'Nope (USA).7z' }, opts), null);
   assert.strictEqual(hits.filter(u => u.endsWith('/Named_Boxarts/')).length, 1, 'index downloaded once for all games');
   assert.ok(fs.existsSync(path.join(dir, 'idx', 'snes.box.json')), 'index cached on disk');
+  // second run (interrupted job, library rebuilt): the jpg on disk is reused, no png download
+  const pngs = hits.filter(u => u.endsWith('.png')).length;
+  const r3 = await C.coverFor({ sys: 'snes', title: 'Super Metroid', file: 'Super Metroid (Japan, USA) (En,Ja).7z' }, opts);
+  assert.strictEqual(r3.art, r1.art); assert.strictEqual(r3.artKind, 'box'); assert.ok(r3.artColor);
+  assert.strictEqual(hits.filter(u => u.endsWith('.png')).length, pngs, 'cached cover not downloaded again');
+  assert.ok(!fs.readdirSync(path.join(dir, 'art', 'snes')).some(f => f.endsWith('.part')), 'no partial files left');
   fs.rmSync(dir, { recursive: true, force: true });
 });

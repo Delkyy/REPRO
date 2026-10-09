@@ -263,7 +263,11 @@ async function scanDir(dir, out, unsorted, forcedSys) {
     if (ARCHIVE_EXT.test(e.name) && ents.some(x => x.name !== e.name && !/\.(7z|zip|rar)$/i.test(x.name) && x.name.toLowerCase().replace(/\.[^.]+$/, '') === e.name.toLowerCase().replace(/\.(7z|zip|rar)$/i, ''))) continue; // extracted copy is right there
     if (ARCHIVE_EXT.test(e.name)) {
       // archived carts: fine when the folder says which system and that system's emulator reads archives
-      const asys = forcedSys || sysFromDir(p);
+      let asys = forcedSys || sysFromDir(p);
+      // translation packs carry their real console in the name ([GBA], [NDS]...) and get dropped in whatever folder
+      const tp = titles.parse(e.name);
+      if (tp.pc) { unsorted.push({ path: p, why: 'pc installer, not a rom' }); continue; }
+      if (tp.sysHint && tp.sysHint !== asys) { if (!ARCHIVE_SYS.has(tp.sysHint)) { unsorted.push({ path: p, why: `${SYSTEMS[tp.sysHint] || tp.sysHint} game, extract it first or add an emulator` }); continue; } asys = tp.sysHint; }
       if (asys && ARCHIVE_SYS.has(asys)) { out.push({ path: p, sys: asys, title: titleFromFile(e.name), file: e.name }); continue; }
     }
     if (/\.(7z|zip|rar)$/i.test(e.name)) {
@@ -574,7 +578,7 @@ if (plat.OS === 'linux') app.commandLine.appendSwitch('enable-features', 'Global
 app.whenReady().then(() => { if (!process.argv.includes('--smoke')) { createWindow(); startGuideHook(); } });
 app.on('window-all-closed', () => app.quit());
 app.on('will-quit', () => { globalShortcut.unregisterAll(); stopGuideHook(); });
-module.exports = { startCovers, IMG, library, saveCtx, launch, killRunning, detectEmulators, scanLibrary, snapshot, config, saveConfig, recipes, resolveDataDir, recipeForExe, isEmulatorFile, ROOT };
+module.exports = { coverRunning: () => !!coverJob, startCovers, IMG, library, saveCtx, launch, killRunning, detectEmulators, scanLibrary, snapshot, config, saveConfig, recipes, resolveDataDir, recipeForExe, isEmulatorFile, ROOT };
 
 // ---------- ipc
 ipcMain.handle('snapshot', () => snapshot());

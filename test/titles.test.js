@@ -51,3 +51,13 @@ test('fan translations merge with the game, trainers are hacks', () => {
   assert.strictEqual(a.group, parse('Teenage Mutant Ninja Turtles 2 (USA).7z').group);
   assert.strictEqual(parse('Contra (USA) [t1].nes').kind, 'hack');
 });
+
+test('chinese translation packs: english name from the brackets, platform tag picks the console', () => {
+  const a = parse('[恶魔城 晓月圆舞曲][キャッスルヴァニア 暁月の円舞曲][Castlevania Aria of Sorrow][20030508][GBA][汉化][GBA].zip');
+  assert.strictEqual(a.name, 'Castlevania Aria of Sorrow'); assert.strictEqual(a.sysHint, 'gba'); assert.strictEqual(a.junk, false);
+  const b = parse("[恶魔城Ⅱ 诅咒的封印][ドラキュラⅡ 呪いの封印][Castlevania Ⅱ Simon's Quest][19881201][FC][汉化][NES].zip");
+  assert.strictEqual(b.name, "Castlevania II Simon's Quest"); assert.strictEqual(b.sysHint, 'nes');
+  assert.strictEqual(parse('[恶魔城 迷宫的画廊][悪魔城ドラキュラ ギャラリーオブラビリンス][CastlevaniaPortrait of Ruin][20061116][NDS][汉化][NDS].zip').name, 'Castlevania Portrait of Ruin');
+  assert.strictEqual(parse('[恶魔城 默示录外传][悪魔城ドラキュラ黙示録外伝 LEGEND OF CORNELL][Castlevania Legacy of Darkness][19991225][N64][汉化][EXE][高清整合安装版].zip').pc, true);
+  assert.strictEqual(parse('[BIOS] Nintendo 64 - PIF (Europe).7z').kind, 'bios', 'normal [BIOS] prefix is not a pack');
+});

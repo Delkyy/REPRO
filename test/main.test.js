@@ -106,7 +106,7 @@ test('every source file parses (renderer included: a syntax error there blanks t
 
 test('archived carts: .7z in a system folder scans for retroarch systems; nes no longer matches snes/genesis folders', async () => {
   const lib = path.join(TMP, 'carts');
-  for (const [d, f] of [['snes', 'Super Metroid (Japan, USA) (En,Ja).7z'], ['genesis', 'Sonic the Hedgehog (USA, Europe).7z'], ['nes', 'Metroid (USA).zip'], ['nes', 'Metroid (USA) (Virtual Console).zip'], ['snes', 'Chrono Trigger (USA).7z'], ['snes', 'Chrono Trigger (USA).sfc'], ['gba', 'Advance Wars (USA).7z'], ['ps2', 'Devil May Cry (USA).zip'], ['misc', 'Mystery.7z']]) {
+  for (const [d, f] of [['gbc', 'Pokemon - Crystal Version (USA, Europe) (Rev 1).7z'], ['gb', 'Tetris (World) (Rev 1).7z'], ['snes', 'Super Metroid (Japan, USA) (En,Ja).7z'], ['genesis', 'Sonic the Hedgehog (USA, Europe).7z'], ['nes', 'Metroid (USA).zip'], ['nes', 'Metroid (USA) (Virtual Console).zip'], ['snes', 'Chrono Trigger (USA).7z'], ['snes', 'Chrono Trigger (USA).sfc'], ['gba', 'Advance Wars (USA).7z'], ['ps2', 'Devil May Cry (USA).zip'], ['misc', 'Mystery.7z']]) {
     fs.mkdirSync(path.join(lib, d), { recursive: true }); fs.writeFileSync(path.join(lib, d, f), 'x');
   }
   M.config.romDirs = [{ path: lib, system: null }];
@@ -116,6 +116,9 @@ test('archived carts: .7z in a system folder scans for retroarch systems; nes no
   assert.strictEqual(sysOf('Sonic the Hedgehog'), 'genesis');
   assert.strictEqual(sysOf('Metroid'), 'nes');
   assert.strictEqual(sysOf('Advance Wars'), 'gba');
+  assert.strictEqual(sysOf('Pokemon - Crystal Version'), 'gbc', 'gbc folder is its own system, not unsorted');
+  assert.strictEqual(sysOf('Tetris'), 'gb');
+  assert.deepStrictEqual(M.recipes.retroarch.cores.gbc, 'mgba');
   const metroids = Object.values(M.library.games).filter(g => g.title.startsWith('Metroid'));
   assert.strictEqual(metroids.length, 1, 'virtual console re-release merges into the same card');
   assert.strictEqual(metroids[0].file, 'Metroid (USA).zip', 'the original cart is the pick, not the VC rip');

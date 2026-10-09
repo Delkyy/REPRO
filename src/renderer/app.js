@@ -29,7 +29,8 @@ const SHORT = { nes: 'NES', snes: 'SNES', n64: 'N64', gc: 'GAMECUBE', wii: 'WII'
 const REGION = f => { const m = (f || '').match(/\((USA|World|Europe|Japan)[,)]/i) || (f || '').match(/\((?:[^()]*, )?(USA|Europe|Japan)\)/i); return m ? ({ usa: 'USA', world: 'WORLD', europe: 'EUR', japan: 'JPN' })[m[1].toLowerCase()] : ''; };
 function barEl(g) {
   const right = g.year || REGION(g.file);
-  return `<div class="cbar"><i class="lg" style="--m:url('${fileUrl(BUNDLE + '/assets/systems/' + g.sys + '.svg')}')"></i><b>${SHORT[g.sys] || esc(sysName(g.sys)).toUpperCase()}</b>${right ? `<span>${esc(String(right))}</span>` : ''}</div>`;
+  const mark = S.sysdb?.[g.sys] ? `<i class="lg" style="--m:url('${fileUrl(BUNDLE + '/assets/systems/' + g.sys + '.svg')}')" title="${esc(sysName(g.sys))}"></i>` : `<b>${SHORT[g.sys] || esc(sysName(g.sys)).toUpperCase()}</b>`;
+  return `<div class="cbar">${mark}${right ? `<span class="rg">${esc(String(right))}</span>` : ''}</div>`;
 }
 function shelfCard(g) {
   const kind = !g.art ? 'none' : g.artKind === 'title' ? 'title' : 'box';
@@ -49,6 +50,7 @@ function matchView(g, v) { if (v.sys && g.sys !== v.sys) return false; if (v.fav
 
 /* ---------- sidebar ---------- */
 function renderSide() {
+  if (!S.all) applyJunk();
   const counts = {}; S.games.forEach(g => counts[g.sys] = (counts[g.sys] || 0) + 1);
   const it = (f, k, txt, n, extra = '') => `<button class="it ${filter == f ? 'on' : ''}" data-f="${f}" ${sysc(k)}>${k ? logo(k) : ''}<span class="tx">${txt}</span>${extra}<span class="n">${n ?? ''}</span></button>`;
   let h = `<details open><summary>Library</summary>
@@ -101,8 +103,10 @@ const ROW_GAP = 16, COL_GAP = 14, LROW_H = 58, OVERSCAN = 2;
 let VL = null; // { l, rows: [{ top, h, items:[i...] }], height, mode, key }
 const cardDims = g => {
   const ch = cardH(), ar = !g.art ? 0.8 : g.artKind === 'title' ? 0.8 : Math.min(1.5, Math.max(0.62, g.artAR || 0.72));
-  return { w: Math.round(ch * ar), h: ch + 22 };
+  return { w: Math.round(ch * ar), h: ch + barH(ch) };
 };
+// top bar grows with the zoom slider; must match --bh in app.css (.grid.shelfgrid) or rows overlap
+const barH = ch => Math.min(42, Math.max(28, ch * 0.16));
 const cardH = () => Math.round((parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cw')) || 150) * 1.3);
 function packRows(l, width, mode) {
   const rows = []; let top = 0;
@@ -152,6 +156,7 @@ function vlLayout(keepScroll) {
   vlPaint(true);
 }
 function renderMain() {
+  if (!S.all) applyJunk();
   if (filter == 'unsorted') { VL = null; return renderUnsorted(); }
   if (filter.startsWith('e:')) { VL = null; return renderEmu(filter.slice(2)); }
   const l = list();
@@ -350,6 +355,7 @@ const C_WIN = 40, C_EDGE = 18; // a screen holds ~11 tiles: always keep 18+ load
 let cData = [], cRowStart = [], cRowCol = [];
 let bgFlip = false;
 function renderCouch() {
+  if (!S.all) applyJunk();
   const rows = []; const cont = played().slice(0, 8); if (cont.length) rows.push({ k: 'continue', n: 'Continue', items: cont });
   for (const k of Object.keys(S.systems)) { const it = S.games.filter(g => g.sys == k).sort(byName); if (it.length) rows.push({ k, n: sysName(k), items: it }); }
   cList = []; cRows = []; cRowStart = [];
